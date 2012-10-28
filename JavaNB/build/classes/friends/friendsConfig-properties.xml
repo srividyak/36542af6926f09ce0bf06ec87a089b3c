@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<!--
+To change this template, choose Tools | Templates
+and open the template in the editor.
+-->
+
+<properties>
+    <entry key="numOfTopFriends">10</entry>
+    <entry key="numOfTopViewed">10</entry>
+</properties>
