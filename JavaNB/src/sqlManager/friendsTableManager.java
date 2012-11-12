@@ -10,6 +10,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.InvalidPropertiesFormatException;
 import java.util.logging.Level;
@@ -36,8 +37,50 @@ public class friendsTableManager {
     }
     
     public void sendRequest(String myUuid, String friendUuid) throws userException {
+        String directQuery = "update friends set relation='0' where myUuid=? and friendUuid=?";
+        String reverseQuery = "select * from friends where myUuid=? and friendUuid=?";
         String query = "insert into friends (myUuid,friendUuid,relation,timeSent,timestamp) values(?,?,?,?,?)";
+        int result;
         try {
+            PreparedStatement directStmt = (PreparedStatement) this.friendsConnection.prepareStatement(directQuery);
+            PreparedStatement reverseStmt = (PreparedStatement) this.friendsConnection.prepareStatement(reverseQuery);
+            directStmt.setString(1,myUuid);
+            directStmt.setString(2, friendUuid);
+            result = directStmt.executeUpdate();
+            if(result == 1) {
+                return;
+            } else {
+                reverseStmt.setString(1, friendUuid);
+                reverseStmt.setString(2, myUuid);
+                ResultSet rs = reverseStmt.executeQuery();
+                while(rs.next()) {
+                    String curMyUuid = rs.getString("myUuid");
+                    String curFriendUuid = rs.getString("friendUuid");
+                    long viewCount = rs.getLong("viewCount");
+                    long reverseViewCount = rs.getLong("reverseViewCount");
+                    long timestamp = rs.getLong("timestamp");
+                    long reverseTimestamp = rs.getLong("reverseTimestamp");
+                    long auxViewCount = rs.getLong("auxViewCount");
+                    long reverseAuxViewCount = rs.getLong("reverseAuxViewCount");
+                    reverseQuery = "update friends set myUuid=?,friendUuid=?,relation=?,viewCount=?,"
+                            + "auxViewCount=?,reverseViewCount=?,reverseAuxViewCount=?,"
+                            + "timestamp=?,reverseTimestamp=? where myUuid=? and friendUuid=?";
+                    reverseStmt = (PreparedStatement) this.friendsConnection.prepareStatement(reverseQuery);
+                    reverseStmt.setString(1,curFriendUuid);
+                    reverseStmt.setString(2,curMyUuid);
+                    reverseStmt.setString(3,"0");
+                    reverseStmt.setLong(4,reverseViewCount);
+                    reverseStmt.setLong(5,reverseAuxViewCount);
+                    reverseStmt.setLong(6,viewCount);
+                    reverseStmt.setLong(7,auxViewCount);
+                    reverseStmt.setLong(8,reverseTimestamp);
+                    reverseStmt.setLong(9,timestamp);
+                    reverseStmt.setString(10,curMyUuid);
+                    reverseStmt.setString(11,curFriendUuid);
+                    reverseStmt.executeUpdate();
+                    return;
+                }
+            }
             long date = (new Date()).getTime();
             PreparedStatement stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
             stmt.setString(1, myUuid);
@@ -53,7 +96,7 @@ public class friendsTableManager {
     }
     
     public void acceptRequest(String myUuid, String friendUuid) throws userException {
-        String query = "update friends set relation=?, timeAccepted=?, reverseTimestamp=? where myUuid=? and friendUuid=?";
+        String query = "update friends set relation=?, timeAccepted=?, reverseTimestamp=? where myUuid=? and friendUuid=? and relation='0'";
         try {
             long date = (new Date()).getTime();
             PreparedStatement stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
@@ -62,7 +105,16 @@ public class friendsTableManager {
             stmt.setLong(3,date);
             stmt.setString(4, friendUuid);
             stmt.setString(5,myUuid);
-            stmt.executeUpdate();
+            int count = stmt.executeUpdate();
+            if(count > 0) {
+                userTableManager sqlManager = new userTableManager();
+                sqlManager.updateFriendsCount(myUuid);
+                sqlManager.updateFriendsCount(friendUuid);
+            }
+        } catch (FileNotFoundException ex) {
+            throw new userException("some error occured while accepting request:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("some error occured while accepting request:" + ex.getMessage());
         } catch (SQLException sqle) {
             throw new userException("some error occured while accepting request:" + sqle.getMessage());
         }
@@ -95,31 +147,65 @@ public class friendsTableManager {
     
     //updates viewCount and timestamp
     public void updateViewCount(String viewerUuid, String vieweeUuid) throws userException {
-        String query = "update friends set viewCount=viewCount+1,timestamp=? where myUuid=? and friendUuid=? or set reverseViewCount=reverseViewCount+1,reverseTimestamp=? where myUuid = ? and friendUuid=?";
+        String getQuery = "select myUuid,friendUuid from friends where (myUuid=? and friendUuid=?) or(myUuid=? and friendUuid=?)", query = "";
         PreparedStatement stmt;
         Long date = (new Date()).getTime();
         try {
+            PreparedStatement getStmt = (PreparedStatement) this.friendsConnection.prepareStatement(getQuery);
+            getStmt.setString(1,viewerUuid);
+            getStmt.setString(2,vieweeUuid);
+            getStmt.setString(3,vieweeUuid);
+            getStmt.setString(4,viewerUuid);
+            ResultSet rs = getStmt.executeQuery();
+            while(rs.next()) {
+                if(rs.getString("myUuid").equals(viewerUuid) && rs.getString("friendUuid").equals(vieweeUuid)) {
+                    query = "update friends set viewCount=viewCount+1,timestamp=? where myUuid=? and friendUuid=?";
+                    stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
+                    stmt.setString(2, viewerUuid);
+                    stmt.setString(3, vieweeUuid);
+                    stmt.setLong(1,date);
+                    try {
+                        stmt.executeUpdate();
+                        return;
+                    } catch(SQLException sqle) {
+                        query = "update friends set auxViewCount=auxViewCount+1,timestamp=? where myUuid=? and friendUuid=?";
+                        stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
+                        stmt.setString(2, viewerUuid);
+                        stmt.setString(3, vieweeUuid);
+                        stmt.setLong(1,date);
+                        stmt.executeUpdate();
+                        return;
+                    }
+                } else if(rs.getString("myUuid").equals(vieweeUuid) && rs.getString("friendUuid").equals(viewerUuid)) {
+                    query = "update friends set reverseViewCount=reverseViewCount+1,timestamp=? where myUuid=? and friendUuid=?";
+                    stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
+                    stmt.setString(2, vieweeUuid);
+                    stmt.setString(3, viewerUuid);
+                    stmt.setLong(1,date);
+                    try {
+                        stmt.executeUpdate();
+                        return;
+                    } catch(SQLException sqle) {
+                        query = "update friends set reverseAuxViewCount=reverseAuxViewCount+1,timestamp=? where myUuid=? and friendUuid=?";
+                        stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
+                        stmt.setString(2, vieweeUuid);
+                        stmt.setString(3, viewerUuid);
+                        stmt.setLong(1,date);
+                        stmt.executeUpdate();
+                        return;
+                    }
+                }
+            }
+            query = "insert into friends (myUuid,friendUuid,relation,timestamp,viewCount) values(?,?,?,?,?)";
             stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
-            stmt.setLong(1,date);
-            stmt.setString(2, viewerUuid);
-            stmt.setString(3, vieweeUuid);
-            stmt.setLong(4,date);
-            stmt.setString(5, vieweeUuid);
-            stmt.setString(6, viewerUuid);
+            stmt.setString(1, viewerUuid);
+            stmt.setString(2, vieweeUuid);
+            stmt.setString(3,"2");
+            stmt.setLong(4, date);
+            stmt.setInt(5,1);
             stmt.executeUpdate();
         } catch(SQLException sqle) {
-            query = "update friends set auxViewCount=auxViewCount+1,timestamp=?  where myUuid=? or set reverseAuxViewCount=reverseAuxViewCount+1,timestamp=? where friendUuid=?";
-            try {
-                stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
-                stmt.setLong(1, date);
-                stmt.setString(2, viewerUuid);
-                stmt.setString(3, vieweeUuid);
-                stmt.setLong(4, date);
-                stmt.setString(5, vieweeUuid);
-                stmt.setString(6, viewerUuid);
-            } catch(SQLException sqle2) {
-                throw new userException("Some error occured during updating viewCount:"+sqle2.getMessage());
-            }
+            throw new userException("Some error occured during updating viewCount:"+sqle.getMessage());
         }
     }
     
@@ -159,20 +245,46 @@ public class friendsTableManager {
         return friends;
     }
     
-    public String[] getMutualFriends(String uuid1, String uuid2) throws userException {
-        String[] friends = {};
+    public ArrayList<String> getMutualFriends(String uuid1, String uuid2) throws userException {
+        ArrayList<String> friends = new ArrayList<String>();
         String query = "select uuid from (select myUuid as uuid from friends where friendUuid=?" +
-                "union select friendUuid as uuid from friends where myUuid=?) as table1 where uuid in" + 
-                "(select myUuid as uuid from friends where friendUuid=?" + 
-                "union select friendUuid as uuid from friends where myUuid=?)";
+                " union select friendUuid as uuid from friends where myUuid=?) as table1 where uuid in" + 
+                " (select myUuid as uuid from friends where friendUuid=?" + 
+                " union select friendUuid as uuid from friends where myUuid=?)";
         try {
             PreparedStatement stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
             stmt.setString(1, uuid1);
             stmt.setString(2, uuid1);
             stmt.setString(3, uuid2);
             stmt.setString(4, uuid2);
+            ResultSet rs = stmt.executeQuery();
+            while(rs.next()) {
+                friends.add(rs.getString("uuid"));
+            }
         } catch (SQLException sqle) {
             throw new userException("exception encountered while fetching mutual friends"+sqle.getMessage());
+        }
+        return friends;
+    }
+    
+    public ArrayList<String> getNonFriends(String friend, String myUuid) throws userException {
+        ArrayList<String> friends = new ArrayList<String>();
+        String query = "select uuid from (select myUuid as uuid from friends where friendUuid=? union "
+                + " select friendUuid as uuid from friends where myUuid=?) as rec1 where uuid not in"
+                + " (select myUuid as uuid from friends where friendUuid=? union"
+                + " select friendUuid as uuid from friends where myUuid=?)";
+        try {
+            PreparedStatement stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
+            stmt.setString(3, friend);
+            stmt.setString(4, friend);
+            stmt.setString(1,myUuid);
+            stmt.setString(2, myUuid);
+            ResultSet rs = stmt.executeQuery();
+            while(rs.next()) {
+                friends.add(rs.getString("uuid"));
+            }
+        } catch(SQLException sqle) {
+            throw new userException("exception encontered while fetching non friends"+sqle.getMessage());
         }
         return friends;
     }

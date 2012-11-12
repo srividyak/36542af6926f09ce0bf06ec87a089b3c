@@ -7,6 +7,7 @@ package javanb.companypackage;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import javanb.userpackage.userException;
 import net.sf.json.JSONObject;
 import sqlManager.companyTableManager;
 
@@ -16,20 +17,17 @@ import sqlManager.companyTableManager;
  */
 public class company {
     String id;
-    String description;
+    String name;
+    String description = "";
     String[] keywords;
     
-    public company(String compId) throws FileNotFoundException, IOException, SQLException {
-        companyTableManager sqlManager = new companyTableManager(compId);
+    public company(JSONObject compData) throws FileNotFoundException, IOException, SQLException, userException {
+        if(!compData.containsKey("id")) {
+            compData.put("id",company.generateId(compData.getString("name")));
+        }
+        companyTableManager sqlManager = new companyTableManager(compData);
         JSONObject companyDetails = sqlManager.getCompanyDetails();
-        this.id = companyDetails.getString("id");
-        this.description = companyDetails.getString("description");
-        this.extractKeys();
-    }
-    
-    public company(String compId, String description) throws FileNotFoundException, IOException, SQLException {
-        companyTableManager sqlManager = new companyTableManager(compId, description);
-        JSONObject companyDetails = sqlManager.getCompanyDetails();
+        this.name = companyDetails.getString("name");
         this.id = companyDetails.getString("id");
         this.description = companyDetails.getString("description");
         this.extractKeys();
@@ -50,5 +48,9 @@ public class company {
     //TODO - extract keys from description
     private void extractKeys() {
         
+    }
+    
+    public static String generateId(String name) {
+        return name.trim().toLowerCase().replace(' ', '_');
     }
 }

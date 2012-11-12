@@ -6,25 +6,34 @@ package javanb.userpackage;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javanb.basicEducationData;
 import javanb.basicUserData;
+import javanb.companypackage.company;
+import javanb.educationpackage.education;
+import javanb.locationpackage.location;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.sf.json.JSONSerializer;
 import sqlManager.userTableManager;
 import org.apache.commons.codec.digest.DigestUtils;
+import sqlManager.friendsTableManager;
 
 /**
  *
  * @author srivid
  */
 public class user {
+
     private String uuid;
     private String firstName;
+    private String middleName;
     private String lastName;
     private String dob;
     private String interests;
@@ -34,29 +43,63 @@ public class user {
     private String lang;
     private String about;
     private String hometown;
-    
-    /*arraylist*/
+    private String email;
+    private long timestamp;
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+    /*
+     * arraylist
+     */
     private ArrayList<basicUserData> locations;
-    private ArrayList<basicUserData> education;
-    private ArrayList<basicUserData> company;
-    
+    private ArrayList<basicEducationData> educations;
+    private ArrayList<basicUserData> companies;
     private String locationString;
     private String educationString;
     private String companyString;
-    
-    //Constructor to get an existing user (getUser by uuid)
-    public user(String _uuidString) throws FileNotFoundException, SQLException, IOException, userException, ParseException {
-        userTableManager tableMgr = new userTableManager(_uuidString);
-        JSONObject userDetails = tableMgr.getUserDetails();
-        this.setUuid(_uuidString);
-        this.initUser(userDetails);
+
+    public user() {
     }
-    
+
+    //Constructor to get an existing user (getUser by uuid)
+    public user(String _uuidString) throws userException {
+        try {
+            userTableManager tableMgr = new userTableManager(_uuidString);
+            JSONObject userDetails = tableMgr.getUserDetails();
+            this.setUuid(_uuidString);
+            String userInfoString = userDetails.toString();
+            this.initUser((JSONObject) JSONSerializer.toJSON(userInfoString));
+        } catch (ParseException ex) {
+            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+        } catch (FileNotFoundException ex) {
+            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+        }
+    }
+
     //Contrustor for adding new user into db (createUser)
     public user(JSONObject userInfo) throws userException, ParseException {
-        this.initUser(userInfo);
+        //serialize userInfo and then pass to initUser since we dont want original object to be manipulated
+        String userInfoString = userInfo.toString();
+        this.initUser((JSONObject) JSONSerializer.toJSON(userInfoString));
         this.setUuid(this.generateUUID());
-        userInfo.put("uuid",this.getUuid());
+        userInfo.put("uuid", this.getUuid());
         try {
             userTableManager newUser = new userTableManager(userInfo);
         } catch (FileNotFoundException ex) {
@@ -67,57 +110,135 @@ public class user {
             Logger.getLogger(user.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    
+
     //API to get userDetails as a JSONObject
     public JSONObject getUserDetails() {
         JSONObject userDetails = new JSONObject();
-        userDetails.put("firstName",this.firstName);
-        userDetails.put("lastName",this.lastName);
-        userDetails.put("dob",this.dob);
-        userDetails.put("interests",this.interests);
-        userDetails.put("phoneNum",this.phoneNum);
-        userDetails.put("gender",this.gender);
-        userDetails.put("relStatus",this.relStatus);
-        userDetails.put("lang",this.lang);
-        userDetails.put("about",this.about);
-        userDetails.put("hometown",this.hometown);
-        userDetails.put("location",this.locationString);
-        userDetails.put("education",this.educationString);
-        userDetails.put("company",this.companyString);
-        userDetails.put("uuid",this.uuid);
+        userDetails.put("firstName", this.firstName);
+        userDetails.put("middleName", this.middleName);
+        userDetails.put("lastName", this.lastName);
+        userDetails.put("dob", this.dob);
+        userDetails.put("interests", this.interests);
+        userDetails.put("phoneNum", this.phoneNum);
+        userDetails.put("gender", this.gender);
+        userDetails.put("relStatus", this.relStatus);
+        userDetails.put("lang", this.lang);
+        userDetails.put("about", this.about);
+        userDetails.put("hometown", this.hometown);
+        userDetails.put("locations", this.locationString);
+        userDetails.put("educations", this.educationString);
+        userDetails.put("companies", this.companyString);
+        userDetails.put("uuid", this.uuid);
+        userDetails.put("email", this.email);
+        userDetails.put("timestamp", this.timestamp);
         return userDetails;
     }
     
+    public void loadUser(JSONObject userInfo) throws userException {
+        try {
+            this.initUser(userInfo);
+        } catch (userException ex) {
+            throw new userException("error occured during initializing user:" + ex.getMessage());
+        } catch (ParseException ex) {
+            throw new userException("error occured during initializing user:" + ex.getMessage());
+        }
+    }
+
     //init all details in local variables
     private void initUser(JSONObject userInfo) throws userException, ParseException {
-        if(userInfo.get("firstName") == null) {
+        //update the user's locations with id so that only id is stored in the users table
+        if (userInfo.containsKey("hometown")) {
+            JSONObject hometown = (JSONObject) JSONSerializer.toJSON(userInfo.getString("hometown"));
+            //put only id and get rid of all other fields
+            if (hometown.containsKey("name")) {
+                hometown.put("id", location.generateId(hometown.getString("name")));
+            } else if (hometown.containsKey("id")) {
+                hometown.put("id", hometown.getString("id"));
+            }
+            hometown.remove("name");
+            hometown.remove("stateName");
+            hometown.remove("stateId");
+            hometown.remove("countryId");
+            hometown.remove("countryName");
+        }
+        if (userInfo.containsKey("locations")) {
+            JSONArray locations = userInfo.getJSONArray("locations");
+            for (int i = 0, max = locations.size(); i < max; i++) {
+                JSONObject loc = locations.getJSONObject(i);
+                if (loc.containsKey("name")) {
+                    loc.put("id", location.generateId(loc.getString("name")));
+                } else if (loc.containsKey("id")) {
+                    loc.put("id", loc.getString("id"));
+                }
+                //get rid of all other fields
+                loc.remove("name");
+                loc.remove("stateName");
+                loc.remove("stateId");
+                loc.remove("countryId");
+                loc.remove("countryName");
+            }
+        }
+        //update user's company with id
+        if (userInfo.containsKey("companies")) {
+            JSONArray companies = userInfo.getJSONArray("companies");
+            for (int i = 0, max = companies.size(); i < max; i++) {
+                JSONObject comp = companies.getJSONObject(i);
+                if (comp.containsKey("name")) {
+                    comp.put("id", company.generateId(comp.getString("name")));
+                } else if (comp.containsKey("id")) {
+                    comp.put("id", comp.getString("id"));
+                }
+                //get rid of all other fields
+                comp.remove("name");
+            }
+        }
+        //update user education with id
+        if (userInfo.containsKey("educations")) {
+            JSONArray educations = userInfo.getJSONArray("educations");
+            for (int i = 0, max = educations.size(); i < max; i++) {
+                JSONObject edu = educations.getJSONObject(i);
+                if (edu.containsKey("name")) {
+                    edu.put("id", education.generateId(edu.getString("name")));
+                } else if (edu.containsKey("id")) {
+                    edu.put("id", edu.getString("id"));
+                }
+                //get rid of name
+                edu.remove("name");
+            }
+        }
+
+        if (!userInfo.containsKey("firstName")) {
             throw new userException("firstName is mandatory");
-        } else if(userInfo.get("lastName") == null) {
+        } else if (!userInfo.containsKey("lastName")) {
             throw new userException("LastName is mandatory");
-        } else if(userInfo.get("dob") == null) {
+        } else if (!userInfo.containsKey("dob")) {
             throw new userException("DOB is mandatory");
-        } else if(userInfo.get("gender") == null) {
+        } else if (!userInfo.containsKey("gender")) {
             throw new userException("Gender is mandatory");
+        } else if (!userInfo.containsKey("email")) {
+            throw new userException("email is mandatory");
         }
         this.setFirstName(userInfo.getString("firstName"));
         this.setLastName(userInfo.getString("lastName"));
         this.setDob(userInfo.getString("dob"));
+        this.setTimestamp((new Date()).getTime());
         String gender = userInfo.getString("gender");
-        if(gender.equalsIgnoreCase("1")) {
+        if (gender.equalsIgnoreCase("1")) {
             this.setGender(true);
         } else {
             this.setGender(false);
         }
-        
+        this.setEmail(userInfo.getString("email"));
         try {
-            this.setAbout(userInfo.containsKey("about") ? userInfo.getString("about") : null);
-            this.setInterests(userInfo.containsKey("interests") ? userInfo.getString("interests") : null);
-            this.setHometown(userInfo.containsKey("homeTown") ? userInfo.getString("homeTown") : null);
-            this.setLang(userInfo.containsKey("lang") ? userInfo.getString("lang") : null);
-            this.setPhoneNum(userInfo.containsKey("phoneNum") ? userInfo.getString("phoneNum") : null);
-            this.setLocations(userInfo.containsKey("locations") ? userInfo.getString("locations") : null);
-            this.setCompany(userInfo.containsKey("company") ? userInfo.getString("company") : null);
-            this.setEducation(userInfo.containsKey("educations") ? userInfo.getString("education") : null);
+            this.setAbout(userInfo.containsKey("about") ? userInfo.getString("about") : "");
+            this.setMiddleName(userInfo.containsKey("middleName") ? userInfo.getString("middleName") : "");
+            this.setInterests(userInfo.containsKey("interests") ? userInfo.getString("interests") : "");
+            this.setHometown(userInfo.containsKey("hometown") ? userInfo.getString("hometown") : "");
+            this.setLang(userInfo.containsKey("lang") ? userInfo.getString("lang") : "");
+            this.setPhoneNum(userInfo.containsKey("phoneNum") ? userInfo.getString("phoneNum") : "");
+            this.setLocations(userInfo.containsKey("locations") ? userInfo.getString("locations") : "");
+            this.setCompany(userInfo.containsKey("companies") ? userInfo.getString("companies") : "");
+            this.setEducation(userInfo.containsKey("educations") ? userInfo.getString("educations") : "");
 
             char relStatus = userInfo.containsKey("relStatus") ? userInfo.getString("relStatus").charAt(0) : '1';
             if ((int) relStatus >= (int) ('1') && (int) relStatus <= (int) ('9')) {
@@ -128,9 +249,9 @@ public class user {
         } catch (Exception e) {
             System.out.println("Could not find some field");
         }
-        
+
     }
-    
+
     //generate a unique id for every user
     public String generateUUID() {
         long now = new Date().getTime();
@@ -144,16 +265,16 @@ public class user {
         this.about = about;
     }
 
-    public void setCompany(ArrayList company) {
+    public void setCompany(ArrayList companies) {
         //TODO - check if assigning directly works correctly
-        this.company = company;
+        this.companies = companies;
     }
-    
+
     public void setCompany(String companyString) throws userException {
         this.companyString = companyString;
-        this.company = new ArrayList<basicUserData>();
-        if(companyString != null) {
-            this.setArrayLists(companyString, this.company);
+        this.companies = new ArrayList<basicUserData>();
+        if (companyString != null) {
+            this.setArrayLists(companyString, this.companies);
         }
     }
 
@@ -163,14 +284,14 @@ public class user {
 
     public void setEducation(ArrayList education) {
         //TODO - check if assigning directly works correctly
-        this.education = education;
+        this.educations = education;
     }
-    
+
     public void setEducation(String educationString) throws userException {
         this.educationString = educationString;
-        this.education = new ArrayList<basicUserData>();
-        if(educationString != null) {
-            this.setArrayLists(educationString, this.education);
+        this.educations = new ArrayList<basicEducationData>();
+        if (educationString != null) {
+            this.setbasicEducationData(educationString, this.educations);
         }
     }
 
@@ -202,32 +323,31 @@ public class user {
         //TODO - check if assigning directly works correctly
         this.locations = locations;
     }
-    
+
+    //company or location should be a JSONArray: each JSONObject of the form: name,startDate,endDate
     private void setArrayLists(String target, ArrayList<basicUserData> targetArrayList) throws userException {
-        String splitLocations[] = target.trim().split(";");
-        for(int i=0,maxLoc=splitLocations.length;i<maxLoc;i++) {
-            String individualLocation[] = splitLocations[i].trim().split(",");
-            int locLength = individualLocation.length;
-            if(locLength <=0 || locLength > 3) {
-                throw new userException("Invalid location format specified");
-            }
-            if(locLength == 1) {
-                targetArrayList.add(new basicUserData(individualLocation[0]));
-            } else if(locLength == 2) {
-                targetArrayList.add(new basicUserData(new Date(Long.parseLong(individualLocation[0],10)), individualLocation[1]));
-            } else if(locLength == 3) {
-                targetArrayList.add(new basicUserData(new Date(Long.parseLong(individualLocation[0],10)), new Date(Long.parseLong(individualLocation[1],10)),individualLocation[2]));
-            }
+        JSONArray basicJSONArray = (JSONArray) JSONSerializer.toJSON(target);
+        for (int i = 0, max = basicJSONArray.size(); i < max; i++) {
+            targetArrayList.add(new basicUserData((JSONObject) basicJSONArray.get(i)));
         }
     }
-    
+
+    //education shd be a JSONArray with each element being a JSONObject with keys: type,major,name,startDate,endDate
+    private void setbasicEducationData(String target, ArrayList<basicEducationData> targetArrayList) throws userException {
+        JSONArray eduJSONArray = (JSONArray) JSONSerializer.toJSON(target);
+        for (int i = 0, max = eduJSONArray.size(); i < max; i++) {
+            targetArrayList.add(new basicEducationData((JSONObject) eduJSONArray.get(i)));
+        }
+    }
+
     /*
-     * locations should be of the format: startDate,endDate,place;startDate,endDate,place;....
+     * locations should be of the format:
+     * startDate,endDate,place;startDate,endDate,place;....
      */
     public void setLocations(String locations) throws userException {
         this.locationString = locations;
         this.locations = new ArrayList<basicUserData>();
-        if(locations != null) {
+        if (locations != null) {
             this.setArrayLists(locations, this.locations);
         }
     }
@@ -249,7 +369,7 @@ public class user {
     }
 
     public ArrayList getCompany() {
-        return company;
+        return companies;
     }
 
     public String getDob() {
@@ -257,7 +377,7 @@ public class user {
     }
 
     public ArrayList getEducation() {
-        return education;
+        return educations;
     }
 
     public String getFirstName() {
@@ -280,6 +400,14 @@ public class user {
         return lang;
     }
 
+    public String getMiddleName() {
+        return middleName;
+    }
+
+    public void setMiddleName(String middleName) {
+        this.middleName = middleName;
+    }
+
     public String getLastName() {
         return lastName;
     }
@@ -299,22 +427,73 @@ public class user {
     public String getUuid() {
         return uuid;
     }
+
+    public void sendRequest(String friendUuid) throws userException {
+        try {
+            friendsTableManager sqlManager = new friendsTableManager();
+            sqlManager.sendRequest(uuid, friendUuid);
+        } catch (FileNotFoundException ex) {
+            throw new userException("some exception occured during sending friend request:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("some exception occured during sending friend request:" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("some exception occured during sending friend request:" + ex.getMessage());
+        }
+    }
+
+    public void acceptRequest(String friendUuid) throws userException {
+        try {
+            friendsTableManager sqlManager = new friendsTableManager();
+            sqlManager.acceptRequest(uuid, friendUuid);
+        } catch (FileNotFoundException ex) {
+            throw new userException("some exception occured during sending friend request:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("some exception occured during sending friend request:" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("some exception occured during sending friend request:" + ex.getMessage());
+        }
+    }
+
+    public JSONObject getFields(String[] fields) throws userException {
+        try {
+            userTableManager sqlManager = new userTableManager();
+            return sqlManager.getFields(fields, uuid);
+        } catch (FileNotFoundException ex) {
+            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+        }
+    }
     
+    public JSONObject getFields(String uuid, String[] fields) throws userException {
+        try {
+            userTableManager sqlManager = new userTableManager();
+            return sqlManager.getFields(fields, uuid);
+        } catch (FileNotFoundException ex) {
+            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+        }
+    }
+
     //to update any field use static methods
     public static void updateStringField(String uuidString, String field, String value) throws FileNotFoundException, IOException, SQLException {
         field = field.trim();
         userTableManager sqlManager = new userTableManager();
         sqlManager.updateStringField(uuidString, field, value);
     }
-    
+
     public static void updateDob(String uuid, String date) throws ParseException, FileNotFoundException, IOException, SQLException {
         userTableManager sqlManager = new userTableManager();
         sqlManager.updateDob(uuid, date);
     }
-    
+
     public static void updateGender(String uuid, boolean gender) throws ParseException, FileNotFoundException, IOException, SQLException {
         userTableManager sqlManager = new userTableManager();
         sqlManager.updateGender(uuid, gender);
     }
-    
 }

@@ -5,6 +5,7 @@
 package javanb;
 
 import java.util.Date;
+import net.sf.json.JSONObject;
 
 /**
  *
@@ -13,31 +14,30 @@ import java.util.Date;
 public class basicUserData {
     private Date startDate;
     private Date endDate;
-    private String id;
-    
-    public basicUserData(Date start, Date end,String basicId) {
-        this.endDate = end;
-        this.startDate = start;
-        this.id = basicId;
-    }
-    
-    public basicUserData(Date start,String basicId) {
-        this.startDate = start;
-        this.endDate = new Date();
-        this.id = basicId;
-    }
-    
-    public basicUserData(String basicId) {
-        this.id = basicId;
-        this.startDate = this.endDate = null;
+    private String name;
+
+    public String getName() {
+        return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    public basicUserData(JSONObject basicData) {
+        if(basicData.containsKey("id")) {
+            this.setName(basicData.getString("id"));
+        }
+        if(basicData.containsKey("startDate")) {
+            this.setStartDate(new Date(Long.parseLong(basicData.getString("startDate"),10)));
+        }
+        if(basicData.containsKey("endDate")) {
+            this.setEndDate(new Date(Long.parseLong(basicData.getString("endDate"),10)));
+        }
+    }
+    
     public Date getEndDate() {
         return endDate;
-    }
-
-    public String getId() {
-        return id;
     }
 
     public Date getStartDate() {
@@ -46,10 +46,6 @@ public class basicUserData {
 
     public void setEndDate(Date endDate) {
         this.endDate = endDate;
-    }
-
-    public void setId(String id) {
-        this.id = id;
     }
 
     public void setStartDate(Date startDate) {
