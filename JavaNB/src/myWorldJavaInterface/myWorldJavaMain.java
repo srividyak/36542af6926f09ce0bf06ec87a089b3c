@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -29,7 +30,8 @@ import net.sf.json.JSONSerializer;
  */
 public class myWorldJavaMain {
     public JSONObject getUser(String uuid) throws userException {
-        user existingUser = new user(uuid);
+        user existingUser = new user();
+        existingUser.fetchUser(uuid);
         return existingUser.getUserDetails();
     }
     
@@ -88,7 +90,8 @@ public class myWorldJavaMain {
         if(userInfo.containsKey("educations")) {
             educationJSON = userInfo.getJSONArray("educations");
         }
-        user newUser = new user(userInfo);
+        user newUser = new user();
+        newUser.insertUser(userInfo);
         
         //update location of the user. Here create a new user object since the calls to create new user and to update locations are parallel. Threading needs to be implemented for this
         this.updateLocationsTable(locations);
@@ -121,23 +124,21 @@ public class myWorldJavaMain {
     
     public void sendRequest(String myUuid, String friendUuid) throws userException {
         user myUser;
-        myUser = new user(myUuid);
+        myUser = new user();
+        myUser.fetchUser(myUuid);
         myUser.sendRequest(friendUuid);
     }
     
     public void acceptRequest(String myUuid, String friendUuid) throws userException {
         user myUser;
-        myUser = new user(myUuid);
+        myUser = new user();
+        myUser.fetchUser(myUuid);
         myUser.acceptRequest(friendUuid);
     }
     
     public void getAllFriends(String uuid) throws userException {
-        friends friends = new friends(uuid);
-        JSONObject myFriends = friends.searchFriends("a");
-        System.out.println("\nafter search:");
-        for(int i=0,max=myFriends.getJSONArray("firstName").size();i<max;i++) {
-            System.out.println(myFriends.getJSONArray("firstName").getJSONObject(i).getString("name"));
-        }
+        friends friends = new friends("06524f6541f83b817bf2f793a0a4ae04");
+        
     }
     
 }

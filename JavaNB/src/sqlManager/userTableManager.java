@@ -24,28 +24,28 @@ import net.sf.json.JSONObject;
  *
  * @author srivid
  */
-public class userTableManager {
+public class userTableManager extends sqlUtils {
     private Connection userConnection = null;
     private JSONObject userDetails;
-    
-    private void getUserConnection() throws FileNotFoundException, IOException, SQLException {
-        sqlUtils utils = new sqlUtils();
-        this.userConnection = utils.getConnection();
-    }
+    public static String[] queries = {
+        "select * from users where uuid=?",
+        "select * from users where email=?"
+    };
     
     public JSONObject getUserDetails() {
         return this.userDetails;
     }
     
-    public boolean updateGender(String uuid, boolean gender) throws SQLException, FileNotFoundException, IOException {
+    public boolean updateGender(String uuid, boolean gender) throws SQLException, FileNotFoundException, IOException, userException {
         String updateQuery = "update users set gender=" + gender + " where uuid=\'" + uuid + "\'";
         PreparedStatement stmt = (PreparedStatement) this.userConnection.prepareStatement(updateQuery);
         stmt.setBoolean(1, gender);
         stmt.setString(2,uuid);
         try {
             int rowCount = stmt.executeUpdate();
-            this.userConnection.close();
             if (rowCount > 0) {
+                PreparedStatement invalidateStmt = this.getPreparedStatement(this.userConnection, userTableManager.queries[0], uuid);
+                this.invalidateCache(invalidateStmt);
                 return true;
             } else {
                 return false;
@@ -57,7 +57,7 @@ public class userTableManager {
         }
     }
     
-    public boolean updateDob(String uuid, String date) throws ParseException, FileNotFoundException, IOException, SQLException {
+    public boolean updateDob(String uuid, String date) throws ParseException, FileNotFoundException, IOException, SQLException, userException {
         SimpleDateFormat simpleDob = new SimpleDateFormat("yyyy-mm-dd", Locale.ENGLISH);
         java.util.Date dob = simpleDob.parse(date);
         java.sql.Date sqlDate = new java.sql.Date(dob.getTime());
@@ -67,8 +67,9 @@ public class userTableManager {
         stmt.setString(2, uuid);
         try {
             int rowCount = stmt.executeUpdate();
-            this.userConnection.close();
             if (rowCount > 0) {
+                PreparedStatement invalidateStmt = this.getPreparedStatement(this.userConnection, userTableManager.queries[0], uuid);
+                this.invalidateCache(invalidateStmt);
                 return true;
             } else {
                 return false;
@@ -80,7 +81,7 @@ public class userTableManager {
         }
     }
     
-    public boolean updateStringField(String uuid, String field, String value) throws FileNotFoundException, IOException, SQLException {
+    public boolean updateStringField(String uuid, String field, String value) throws FileNotFoundException, IOException, SQLException, userException {
         //TODO: investigate why placeholder logic isnt working
         String updateQuery = "update users set " + field + "=\'" + value + "\' where uuid=" + "\'" + uuid + "\'";
         PreparedStatement stmt = (PreparedStatement) this.userConnection.prepareStatement(updateQuery);
@@ -89,8 +90,9 @@ public class userTableManager {
 //        stmt.setString(3, uuid);
         try {
             int rowCount = stmt.executeUpdate();
-            this.userConnection.close();
             if (rowCount > 0) {
+                PreparedStatement invalidateStmt = this.getPreparedStatement(this.userConnection, userTableManager.queries[0], uuid);
+                this.invalidateCache(invalidateStmt);
                 return true;
             } else {
                 return false;
@@ -104,9 +106,16 @@ public class userTableManager {
     
     //default constructor for tableManager
     public userTableManager() throws FileNotFoundException, IOException, SQLException {
-        this.getUserConnection();
+        super();
+        this.userConnection = this.getConnection();
     }
     
+    /**
+     * API to get multiple users in one shot. This query's results are not cached for performance reasons.
+     * @param uuids - list of uuids whose user info are to be fetched
+     * @return JSONArray of user info
+     * @throws userException 
+     */
     public JSONArray getMultipleUsers(ArrayList<String> uuids) throws userException {
         try {
             String query = "select * from users where uuid in ({})";
@@ -154,12 +163,13 @@ public class userTableManager {
     //user already exists. do a select
     public userTableManager(String uuid) throws userException, FileNotFoundException, IOException, SQLException {
         //TODO: debug as to why preparedstatement is not working for select queries
-        this.getUserConnection();
+        super();
+        this.userConnection = this.getConnection();
         String query = "select * from users where uuid=?";
         PreparedStatement stmt = (PreparedStatement) this.userConnection.prepareStatement(query);
         stmt.setString(1, uuid);
         try {
-            ResultSet resultSet = stmt.executeQuery();
+            ResultSet resultSet = this.executeQuery(stmt);
             this.userDetails = new JSONObject();
             boolean noUserFlag = true;
             while(resultSet.next()) {
@@ -187,38 +197,15 @@ public class userTableManager {
         } catch(SQLException sqle) {
             throw new userException("Could not find user with uuid="+uuid);
         }
-        
-        this.userConnection.close();
-    }
-    
-    public void updateFriends(String uuid, String friends) throws userException {
-        String query = "update users set friends=concat(friends+\',\'+?) where uuid=?";
-        try {
-            PreparedStatement updateStmt = (PreparedStatement) this.userConnection.prepareStatement(query);
-            updateStmt.setString(1, friends);
-            updateStmt.setString(2, uuid);
-            updateStmt.executeUpdate();
-        } catch (SQLException ex) {
-            throw new userException("unable to add friend to uuid="+uuid);
-        }
     }
     
     public JSONObject getFields(String[] fields, String uuid) throws userException {
-        String query = "select {placeholder} from users where uuid=?";
-        String replacements = "";
+        String query = "select * from users where uuid=?";
         ResultSet rs;
-        for(int i=0,max=fields.length;i<max;i++) {
-            if(i==max-1) {
-                replacements += fields[i];
-            } else {
-                replacements += fields[i] + ",";
-            }
-        }
-        query = query.replace("{placeholder}", replacements);
         try {
             PreparedStatement stmt = (PreparedStatement) this.userConnection.prepareStatement(query);
             stmt.setString(1, uuid);
-            rs = stmt.executeQuery();
+            rs = this.executeQuery(stmt);
             JSONObject result = new JSONObject();
             while(rs.next()) {
                 for(int i=0,max=fields.length;i<max;i++) {
@@ -231,21 +218,70 @@ public class userTableManager {
         }
     }
     
-    public void updateFriendsCount(String uuid) throws userException {
+    public JSONArray getFieldsForMultipleUuid(String[] fields, ArrayList<String> uuids) throws userException {
+        JSONArray result = new JSONArray();
+        String query = "select * from users where uuid in ({})";
+        ResultSet rs;
+        String replacements = "";
+        for(int i=0,max=uuids.size();i<max;i++) {
+            if(i==max-1) {
+                replacements += "?";
+            } else {
+                replacements += "?,";
+            }
+        }
+        query = query.replace("{}", replacements);
         try {
-            String query = "update users set friendsCount=friendsCount+1 where uuid=?";
+            PreparedStatement stmt = (PreparedStatement) this.userConnection.prepareStatement(query);
+            for(int i=0,max=uuids.size();i<max;i++) {
+                stmt.setString(i+1,uuids.get(i));
+            }
+            rs = stmt.executeQuery();
+            while(rs.next()) {
+                for(int i=0,max=fields.length;i<max;i++) {
+                    JSONObject temp = new JSONObject();
+                    temp.put(fields[i], rs.getString(fields[i]));
+                    result.add(temp);
+                }
+            }
+        } catch(SQLException sqle) {
+            throw new userException("unable to get specified fields");
+        }
+        return result;
+    }
+    
+    public void updateFriendsCount(String uuid, int increase) throws userException {
+        try {
+            String query;
+            if(increase == 0) {
+                query = "update users set friendsCount=friendsCount-1 where uuid=?";
+            } else {
+                query = "update users set friendsCount=friendsCount+1 where uuid=?";
+            }
             PreparedStatement stmt = (PreparedStatement) this.userConnection.prepareStatement(query);
             stmt.setString(1,uuid);
             stmt.executeUpdate();
+            PreparedStatement invalidateStmt = this.getPreparedStatement(this.userConnection, userTableManager.queries[0], uuid);
+            this.invalidateCache(invalidateStmt);
         } catch (SQLException ex) {
             throw new userException("error occured during updating friends count for uuid="+uuid+ex.getMessage());
         }
         
     }
     
+    public void invalidateCacheForUuids(String uuid) throws userException {
+        String[] uuids = uuid.split(",");
+        PreparedStatement[] stmts = new PreparedStatement[uuids.length];
+        for(int i=0,max=stmts.length;i<max;i++) {
+            stmts[i] = this.getPreparedStatement(userConnection, userTableManager.queries[i], uuids[i]);
+        }
+        this.invalidateCache(stmts);
+    }
+    
     //new user to be created. do an insert
     public userTableManager(JSONObject userInfo) throws FileNotFoundException, IOException, SQLException, ParseException, userException {
-        this.getUserConnection();
+        super();
+        this.userConnection = this.getConnection();
         String email = userInfo.getString("email");
         String selectQuery = "select * from users where email=?";
         PreparedStatement selectStmt = (PreparedStatement) this.userConnection.prepareStatement(selectQuery);
@@ -280,6 +316,5 @@ public class userTableManager {
         } catch(SQLException sqle) {
             System.err.println("Could not insert user");
         }
-        this.userConnection.close();
     }
 }

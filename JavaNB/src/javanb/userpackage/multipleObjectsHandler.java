@@ -7,10 +7,7 @@ package javanb.userpackage;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.sf.json.JSONArray;
 import sqlManager.userTableManager;
 
@@ -18,12 +15,12 @@ import sqlManager.userTableManager;
  *
  * @author srivid
  */
-public class multipleUsers {
-    ArrayList<user> multipleUsers;
-
-    public multipleUsers(ArrayList<String> uuids) throws userException {
+public class multipleObjectsHandler {
+    
+    public static ArrayList<user> getUsers(ArrayList<String> uuids) throws userException {
+        ArrayList<user> multipleUsers = new ArrayList<user>();
         try {
-            this.multipleUsers = new ArrayList<user>();
+            multipleUsers = new ArrayList<user>();
             userTableManager sqlManager = new userTableManager();
             JSONArray users = sqlManager.getMultipleUsers(uuids);
             for (int i = 0, max = users.size(); i < max; i++) {
@@ -40,13 +37,10 @@ public class multipleUsers {
         } catch (SQLException ex) {
             throw new userException("error occured during fetching multiple users:" + ex.getMessage());
         }
+        return  multipleUsers;
     }
     
-    public multipleUsers() {
-        
-    }
-    
-    public JSONArray getMultipleFields(String[] fields, ArrayList<String> uuids) throws userException {
+    public static JSONArray getUserFields(String[] fields, ArrayList<String> uuids) throws userException {
         JSONArray result = new JSONArray();
         try {
             userTableManager sqlManager = new userTableManager();
@@ -60,8 +54,9 @@ public class multipleUsers {
         }
         return result;
     }
-
-    public ArrayList<user> getMultipleUsers() {
-        return multipleUsers;
+    
+    public static JSONArray getNonFriends(String myUuid, ArrayList<String> friendUuid) {
+        JSONArray result = new JSONArray();
+        return result;
     }
 }

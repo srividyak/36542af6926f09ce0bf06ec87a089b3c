@@ -31,6 +31,6 @@ public class JavaNB {
     public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException {
         // TODO code application logic here
         myWorldJavaMain myWorld = new myWorldJavaMain();
-        myWorld.getAllFriends("6a05b8829cbad91c53796337002b83c6");
+        myWorld.getAllFriends("0fccd71a31ac5da989948b822ed8846b");
     }
 }

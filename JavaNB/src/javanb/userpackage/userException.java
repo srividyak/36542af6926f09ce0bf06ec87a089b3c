@@ -9,13 +9,13 @@ package javanb.userpackage;
  * @author srivid
  */
 public class userException extends Exception {
-    private String errorMsg;
+private String errorMsg;
     public String getErrorMsg() {
         return errorMsg;
     }
     public userException(String msgString) {
         errorMsg = msgString;
-        System.out.println(msgString);
+        System.err.println(msgString);
     }
     
 }

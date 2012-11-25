@@ -73,41 +73,47 @@ public class user {
 
     public user() {
     }
+    
+    /*
+     * Provides this constructor to accept an existing uuid. This can be used to update/set fields in user table
+     */
+    public user(String uuidString) {
+        this.setUuid(uuidString);
+    }
 
-    //Constructor to get an existing user (getUser by uuid)
-    public user(String _uuidString) throws userException {
+    public void fetchUser(String _uuidString) throws userException {
         try {
             userTableManager tableMgr = new userTableManager(_uuidString);
             JSONObject userDetails = tableMgr.getUserDetails();
             this.setUuid(_uuidString);
-            String userInfoString = userDetails.toString();
-            this.initUser((JSONObject) JSONSerializer.toJSON(userInfoString));
+            this.initUser(userDetails);
         } catch (ParseException ex) {
-            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+            throw new userException("error while fetching user"+ex.getMessage());
+        } catch (userException ex) {
+            throw new userException("error while fetching user"+ex.getMessage());
         } catch (FileNotFoundException ex) {
-            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+            throw new userException("error while fetching user"+ex.getMessage());
         } catch (IOException ex) {
-            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+            throw new userException("error while fetching user"+ex.getMessage());
         } catch (SQLException ex) {
-            throw new userException("error while finding user with uuid:"+_uuidString+" :" +ex.getMessage());
+            throw new userException("error while fetching user"+ex.getMessage());
         }
     }
-
-    //Contrustor for adding new user into db (createUser)
-    public user(JSONObject userInfo) throws userException, ParseException {
-        //serialize userInfo and then pass to initUser since we dont want original object to be manipulated
-        String userInfoString = userInfo.toString();
-        this.initUser((JSONObject) JSONSerializer.toJSON(userInfoString));
-        this.setUuid(this.generateUUID());
-        userInfo.put("uuid", this.getUuid());
+    
+    public void insertUser(JSONObject userInfo) throws userException {
         try {
+            this.initUser(userInfo);
+            this.setUuid(this.generateUUID());
+            userInfo.put("uuid", this.getUuid());
             userTableManager newUser = new userTableManager(userInfo);
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(user.class.getName()).log(Level.SEVERE, null, ex);
+            throw new userException("error while inserting user"+ex.getMessage());
         } catch (IOException ex) {
-            Logger.getLogger(user.class.getName()).log(Level.SEVERE, null, ex);
+            throw new userException("error while inserting user"+ex.getMessage());
         } catch (SQLException ex) {
-            Logger.getLogger(user.class.getName()).log(Level.SEVERE, null, ex);
+            throw new userException("error while inserting user"+ex.getMessage());
+        } catch (ParseException ex) {
+            throw new userException("error while inserting user"+ex.getMessage());
         }
     }
 
@@ -134,6 +140,9 @@ public class user {
         return userDetails;
     }
     
+    /*
+     * API which takes in a jsonobj of user details and initializes the user object
+     */
     public void loadUser(JSONObject userInfo) throws userException {
         try {
             this.initUser(userInfo);
@@ -466,33 +475,20 @@ public class user {
             throw new userException("some exception occured while fetching fields" + ex.getMessage());
         }
     }
-    
-    public JSONObject getFields(String uuid, String[] fields) throws userException {
-        try {
-            userTableManager sqlManager = new userTableManager();
-            return sqlManager.getFields(fields, uuid);
-        } catch (FileNotFoundException ex) {
-            throw new userException("some exception occured while fetching fields" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("some exception occured while fetching fields" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("some exception occured while fetching fields" + ex.getMessage());
-        }
-    }
 
     //to update any field use static methods
-    public static void updateStringField(String uuidString, String field, String value) throws FileNotFoundException, IOException, SQLException {
+    public static void updateStringField(String uuidString, String field, String value) throws FileNotFoundException, IOException, SQLException, userException {
         field = field.trim();
         userTableManager sqlManager = new userTableManager();
         sqlManager.updateStringField(uuidString, field, value);
     }
 
-    public static void updateDob(String uuid, String date) throws ParseException, FileNotFoundException, IOException, SQLException {
+    public static void updateDob(String uuid, String date) throws ParseException, FileNotFoundException, IOException, SQLException, userException {
         userTableManager sqlManager = new userTableManager();
         sqlManager.updateDob(uuid, date);
     }
 
-    public static void updateGender(String uuid, boolean gender) throws ParseException, FileNotFoundException, IOException, SQLException {
+    public static void updateGender(String uuid, boolean gender) throws ParseException, FileNotFoundException, IOException, SQLException, userException {
         userTableManager sqlManager = new userTableManager();
         sqlManager.updateGender(uuid, gender);
     }

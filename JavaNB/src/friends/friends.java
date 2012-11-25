@@ -4,21 +4,17 @@
  */
 package friends;
 
-import com.mysql.jdbc.PreparedStatement;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javanb.userpackage.multipleUsers;
+import javanb.userpackage.multipleObjectsHandler;
 import javanb.userpackage.user;
 import javanb.userpackage.userException;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import sqlManager.friendsTableManager;
-import sqlManager.userTableManager;
 
 /**
  *
@@ -91,7 +87,7 @@ public class friends {
             }
             return null;
         }
-        
+
         public void resetChildPtr() {
             this.childPointer = 0;
         }
@@ -179,7 +175,7 @@ public class friends {
         JSONArray topViewedFromDB = this.fetchAllViewed();
         topViewedFromDB = this.sort(topViewedFromDB);
         ArrayList<String> friends = new ArrayList<String>();
-        for(int i=0,max=topViewedFromDB.size();i<max;i++) {
+        for (int i = 0, max = topViewedFromDB.size(); i < max; i++) {
             friends.add(topViewedFromDB.getJSONObject(i).getString("uuid"));
         }
         return friends;
@@ -306,43 +302,56 @@ public class friends {
     }
 
     /*
-     * gets mutual friends with a friend of uuid - friendUuid
-     * @param friendUuid - uuid of friend
-     * returns arraylist of uuids of mutual friends
+     * gets mutual friends with a friend of uuid - friendUuid @param friendUuid
+     * - uuid of friend returns arraylist of uuids of mutual friends
      */
     public ArrayList<String> getMutualFriends(String friendUuid) throws userException {
+        return this.chooseFromFriends(friendUuid, "mutualFriends");
+    }
+
+    public ArrayList<String> chooseFromFriends(String friend, String typeOfFriends) throws userException {
         ArrayList<String> friends = new ArrayList<String>();
+        if (!typeOfFriends.equals("nonFriends") && !typeOfFriends.equals("mutualFriends")) {
+            throw new userException("invalid type of friends mentioned");
+        }
         try {
             friendsTableManager sqlManager = new friendsTableManager();
-            friends = sqlManager.getMutualFriends(this.uuid, friendUuid);
+            JSONArray myFriends = this.fetchAllFriends();
+            JSONArray friendFriends = sqlManager.getFriends(friend, "all");
+            //create a hashtable for myfriends with key as uuid and value being 1
+            Hashtable<String, Integer> myFriendsHashtable = new Hashtable<String, Integer>();
+            for (int i = 0, max = myFriends.size(); i < max; i++) {
+                myFriendsHashtable.put(myFriends.getJSONObject(i).getString("uuid"), 1);
+            }
+            for (int i = 0, max = friendFriends.size(); i < max; i++) {
+                String uuid = friendFriends.getJSONObject(i).getString("uuid");
+                if (!typeOfFriends.equals("nonFriends"))  {
+                    if (!myFriendsHashtable.containsKey(uuid)) {
+                        friends.add(uuid);
+                    }
+                } else if (!typeOfFriends.equals("mutualFriends"))  {
+                    if (myFriendsHashtable.containsKey(uuid)) {
+                        friends.add(uuid);
+                    }
+                }
+            }
         } catch (FileNotFoundException ex) {
-            throw new userException("some exception occured while fetching mutual friends:" + ex.getMessage());
+            throw new userException("some exception occured while fetching friend's friends:" + ex.getMessage());
         } catch (IOException ex) {
-            throw new userException("some exception occured while fetching mutual friends:" + ex.getMessage());
+            throw new userException("some exception occured while fetching friend's friends:" + ex.getMessage());
         } catch (SQLException ex) {
-            throw new userException("some exception occured while fetching mutual friends:" + ex.getMessage());
+            throw new userException("some exception occured while fetching friend's friends:" + ex.getMessage());
         }
         return friends;
     }
 
     /*
-     * gets all friends of friend of uuid who are not friends of uuid
-     * @param friend - uuid of the friend
-     * returns arrayList of uuids of friends
+     * gets all friends of friend of uuid who are not friends of uuid @param
+     * friend - uuid of the friend returns arrayList of uuids of friends fetch
+     * myFriends and friend's friends and compare both to determine non friends
      */
     public ArrayList<String> getNonFriends(String friend) throws userException {
-        ArrayList<String> friends = new ArrayList<String>();
-        try {
-            friendsTableManager sqlManager = new friendsTableManager();
-            friends = sqlManager.getNonFriends(friend, this.uuid);
-        } catch (FileNotFoundException ex) {
-            throw new userException("some exception occured while fetching mutual friends:" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("some exception occured while fetching mutual friends:" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("some exception occured while fetching mutual friends:" + ex.getMessage());
-        }
-        return friends;
+        return this.chooseFromFriends(friend, "nonFriends");
     }
 
     private boolean isPresent(String friend, JSONArray allFriends) {
@@ -363,15 +372,15 @@ public class friends {
         if (this.isPresent(friend, allFriends)) {
             return level;
         }
+        ArrayList<String> firstLevelUuids = new ArrayList<String>();
+        for (int i = 0, max = allFriends.size(); i < max; i++) {
+            firstLevelUuids.add(allFriends.getJSONObject(i).getString("uuid"));
+        }
+        String[] fields = {"friendsCount"};
+        JSONArray friendsCount = multipleObjectsHandler.getUserFields(fields, firstLevelUuids);
         for (int i = 0, max = allFriends.size(); i < max; i++) {
             JSONObject friendObj = allFriends.getJSONObject(i);
-            String friendUuid = friendObj.getString("uuid");
-            user newUser = new user();
-            String[] fields = {"friendsCount"};
-            JSONObject friendsCountObj = newUser.getFields(friendUuid, fields);
-            if (friendsCountObj.containsKey("friendsCount")) {
-                friendObj.put("friendsCount", friendsCountObj.getInt("friendsCount"));
-            }
+            friendObj.put("friendsCount", friendsCount.getJSONObject(i).getString("friendsCount"));
         }
         this.sortBasis = "friendsCount";
         this.sort(allFriends);
@@ -389,10 +398,10 @@ public class friends {
 
     private void attachChildrenToNetwork(JSONArray nextLevelFriends, networkBlob curNode) throws userException {
         for (int i = 0, max = nextLevelFriends.size(); i < max; i++) {
-            user me = new user();
+            user me = new user(this.uuid);
             String[] fields = {"friendsCount"};
             JSONObject friend = nextLevelFriends.getJSONObject(i);
-            JSONObject friendsCountObj = me.getFields(this.uuid, fields);
+            JSONObject friendsCountObj = me.getFields(fields);
             friend.put("friendsCount", friendsCountObj.getInt("friendsCount"));
         }
         this.sortBasis = "friendsCount";
@@ -407,22 +416,25 @@ public class friends {
     //Loads an n-ary tree with uuid as root, at 2nd level : all friends of uuid, 
     //@ 3rd level: friends of 2nd level but non friends of uuid
     protected void loadFriendNetwork() throws userException {
-        this.myNetwork = new networkBlob(uuid);
-        networkBlob curNode = this.myNetwork;
-        JSONArray nextLevelFriends = this.fetchAllFriends();
-        this.attachChildrenToNetwork(nextLevelFriends, curNode);
-        nextLevelFriends = new JSONArray();
-        networkBlob parent = curNode;
-        for (int i = 0, max = parent.childCount; i < max; i++) {
-            curNode = parent.children.get(i);
-            ArrayList<String> nonFriends = this.getNonFriends(curNode.uuid);
-            for (int j = 0, maxj = nonFriends.size(); j < maxj; j++) {
-                JSONObject nonFriendJSONObject = new JSONObject();
-                nonFriendJSONObject.put("uuid", nonFriends.get(i));
-                nextLevelFriends.add(nonFriendJSONObject);
-                this.attachChildrenToNetwork(nextLevelFriends, curNode);
+        if (this.myNetwork == null) {
+            this.myNetwork = new networkBlob(uuid);
+            networkBlob curNode = this.myNetwork;
+            JSONArray nextLevelFriends = this.fetchAllFriends();
+            this.attachChildrenToNetwork(nextLevelFriends, curNode);
+            nextLevelFriends = new JSONArray();
+            networkBlob parent = curNode;
+            for (int i = 0, max = parent.childCount; i < max; i++) {
+                curNode = parent.children.get(i);
+                ArrayList<String> nonFriends = this.getNonFriends(curNode.uuid);
+                for (int j = 0, maxj = nonFriends.size(); j < maxj; j++) {
+                    JSONObject nonFriendJSONObject = new JSONObject();
+                    nonFriendJSONObject.put("uuid", nonFriends.get(i));
+                    nextLevelFriends.add(nonFriendJSONObject);
+                    this.attachChildrenToNetwork(nextLevelFriends, curNode);
+                }
             }
         }
+
     }
 
     /*
@@ -436,10 +448,9 @@ public class friends {
         System.out.println("before fetch:" + new Date().getTime());
         ArrayList<String> topViewedFriends = this.getTopViewed();
         System.out.println("after fetching friends uuid:" + new Date().getTime());
-        multipleUsers mulUsers = new multipleUsers(topViewedFriends);
-        ArrayList<user> users = mulUsers.getMultipleUsers();
+        ArrayList<user> users = multipleObjectsHandler.getUsers(topViewedFriends);
         System.out.println("after fetching users:" + new Date().getTime());
-        for(int i=0,max=users.size();i<max;i++) {
+        for (int i = 0, max = users.size(); i < max; i++) {
             user me = users.get(i);
             this.addNameIntoFriendsTrie(me.getFirstName(), topViewedFriends.get(i), "firstName");
             this.addNameIntoFriendsTrie(me.getLastName(), topViewedFriends.get(i), "lastName");
@@ -449,11 +460,11 @@ public class friends {
     }
 
     /*
-     * populates namesArray with the matched names. When a partial name has been matched, this API
-     * can be used to auto complete the search results
-     * @param namesArray - this JSONArray is populated with matched results at the end of the function
-     * @param prefix - partially matched string
-     * @param root - the trie in which search is to be performed
+     * populates namesArray with the matched names. When a partial name has been
+     * matched, this API can be used to auto complete the search results @param
+     * namesArray - this JSONArray is populated with matched results at the end
+     * of the function @param prefix - partially matched string @param root -
+     * the trie in which search is to be performed
      */
     private void populateSearchFriendsObject(JSONArray namesArray, String prefix, friendsTrie root) {
         ArrayList<friendsTrie> stack = new ArrayList<friendsTrie>();
@@ -482,8 +493,8 @@ public class friends {
     }
 
     /*
-     * API to parse a trie - does a DFS and prints out the contents of the trie. This is only for test
-     * @param trie - the trie to parse
+     * API to parse a trie - does a DFS and prints out the contents of the trie.
+     * This is only for test @param trie - the trie to parse
      */
     public void parse(friendsTrie trie) {
         ArrayList<friendsTrie> stack = new ArrayList<friendsTrie>();
@@ -514,19 +525,19 @@ public class friends {
         this.loadTries();
         this.parse(this.firstNameTrie);
     }
-    
+
     /*
-     * This API can be called to search for firstName,lastname and middlename starting with "name"
-     * @param name - initial characters to be searched for in trie
-     * This loads the trie just once. Hence same function can be called multiple times without fetching
-     * data repeatedly
+     * This API can be called to search for firstName,lastname and middlename
+     * starting with "name" @param name - initial characters to be searched for
+     * in trie This loads the trie just once. Hence same function can be called
+     * multiple times without fetching data repeatedly
      */
     public JSONObject searchFriends(String name) throws userException {
         JSONObject friends = new JSONObject();
         friends.put("firstName", new JSONArray());
         friends.put("lastName", new JSONArray());
         friends.put("middleName", new JSONArray());
-        if(!this.trieFlag) {
+        if (!this.trieFlag) {
             this.loadTries();
         }
         friendsTrie firstNameSearchNode = this.searchTrie(name, this.firstNameTrie);
@@ -549,10 +560,9 @@ public class friends {
     }
 
     /*
-     * This API searches for name in thr trie.
-     * @param - name - name to be searched
-     * @param root - trie in which search is to be performed
-     * returns the pointer in the trie where the last character of name matched
+     * This API searches for name in thr trie. @param - name - name to be
+     * searched @param root - trie in which search is to be performed returns
+     * the pointer in the trie where the last character of name matched
      */
     private friendsTrie searchTrie(String name, friendsTrie root) {
         friendsTrie ptr = root;
@@ -577,11 +587,11 @@ public class friends {
     }
 
     /*
-     * API to populate the trie. Populates the trie with uuid in case end is reached
-     * @param name - name to be populated
-     * @param friendUuid - uuid of the user to be inserted at end
-     * @param nameType - indicates if name is first/last/middle name
-     * 
+     * API to populate the trie. Populates the trie with uuid in case end is
+     * reached @param name - name to be populated @param friendUuid - uuid of
+     * the user to be inserted at end @param nameType - indicates if name is
+     * first/last/middle name
+     *
      */
     private void addNameIntoFriendsTrie(String name, String friendUuid, String nameType) throws userException {
         friendsTrie temp = null;
@@ -612,9 +622,5 @@ public class friends {
                 temp.setEnd(friendUuid);
             }
         }
-    }
-    
-    public void recommendedFriends() {
-        
     }
 }
