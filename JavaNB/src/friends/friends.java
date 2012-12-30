@@ -9,6 +9,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javanb.basicEducationData;
+import javanb.basicUserData;
 import javanb.userpackage.multipleObjectsHandler;
 import javanb.userpackage.user;
 import javanb.userpackage.userException;
@@ -325,11 +330,11 @@ public class friends {
             }
             for (int i = 0, max = friendFriends.size(); i < max; i++) {
                 String uuid = friendFriends.getJSONObject(i).getString("uuid");
-                if (!typeOfFriends.equals("nonFriends"))  {
+                if (!typeOfFriends.equals("nonFriends")) {
                     if (!myFriendsHashtable.containsKey(uuid)) {
                         friends.add(uuid);
                     }
-                } else if (!typeOfFriends.equals("mutualFriends"))  {
+                } else if (!typeOfFriends.equals("mutualFriends")) {
                     if (myFriendsHashtable.containsKey(uuid)) {
                         friends.add(uuid);
                     }
@@ -621,6 +626,73 @@ public class friends {
             if (i == max - 1) {
                 temp.setEnd(friendUuid);
             }
+        }
+    }
+
+    /**
+     * API to get all friends with same company/educational institute. For now
+     * these 2 fields are supported.
+     *
+     * @param uuid - uuid for whom friends are to be associated
+     * @param field - company/education
+     * @return
+     */
+    public static ArrayList<String> getFriendsWithSameField(final String uuid, String field) throws userException {
+        try {
+            ArrayList<String> friends = new ArrayList<String>();
+            
+            Callable allfriendsCallable = new Callable() {
+
+                @Override
+                public Object call() throws userException {
+                    friends friends = new friends(uuid);
+                    return friends.getAllFriends();
+                }
+            };
+            
+            Callable fetchUserCallable = new Callable() {
+
+                @Override
+                public Object call() throws userException {
+                    user me = new user(uuid);
+                    me.fetchUser(uuid);
+                    return me;
+                }
+            };
+            
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            ArrayList<Callable<Object>> list = new ArrayList<Callable<Object>>();
+            list.add(allfriendsCallable);
+            list.add(fetchUserCallable);
+            
+            ArrayList<Future<Object>> futureList = new ArrayList<Future<Object>>();
+            futureList = (ArrayList<Future<Object>>) executor.invokeAll(list);
+            
+            ArrayList<String> myFriends = (ArrayList<String>) futureList.get(0).get();
+            user me = (user) futureList.get(1).get();
+            ArrayList<user> friendsDetails = multipleObjectsHandler.getUsers(myFriends);
+            if ("education".equals(field)) {
+                String myEdu = ((basicEducationData) (me.getEducation().get(0))).getName();
+                for (user friend : friendsDetails) {
+                    String eduId = ((basicEducationData) (me.getEducation().get(0))).getName();
+                    if(eduId.equals(myEdu)) {
+                        friends.add(eduId);
+                    }
+                }
+            } else if("company".equals(field)) {
+                String myCompany = ((basicUserData) (me.getEducation().get(0))).getName();
+                for (user friend : friendsDetails) {
+                    String compId = ((basicUserData) (me.getEducation().get(0))).getName();
+                    if(compId.equals(myCompany)) {
+                        friends.add(compId);
+                    }
+                }
+            }
+            return friends;
+        } catch (ExecutionException ex) {
+            throw new userException("some exception occured while excuting in thread:" + ex.getMessage());
+        } catch (InterruptedException ex) {
+            throw new userException("some exception occured while excuting in thread:" + ex.getMessage());
         }
     }
 }

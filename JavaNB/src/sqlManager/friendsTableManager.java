@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javanb.userpackage.userException;
@@ -318,6 +319,78 @@ public class friendsTableManager extends sqlUtils {
         }
         return friends;
     }
+    
+    /**
+     * fetches friends of multiple users at once
+     * Not caching this data for now for performance reasons
+     * @param uuids
+     * @return 
+     */
+    public Hashtable getMultipleFriends(ArrayList<String> uuids) {
+        try {
+            Hashtable friends = new Hashtable();
+            for(int i=0,max=uuids.size();i<max;i++) {
+                friends.put(uuids.get(i), new ArrayList<String>());
+            }
+            String query = "select * from friends where myUuid in (replaceable) union select * from friends where friendUuid in (replaceable)";
+            String replacements = "";
+            for(int i=0,max=uuids.size();i<max;i++) {
+                replacements += "?,";
+            }
+            int len = replacements.length();
+            if(len > 0) {
+                if(replacements.charAt(len - 1) == ',') {
+                    replacements = replacements.substring(0, len - 1);
+                }
+            }
+            query = query.replaceAll("replaceable", replacements);
+            PreparedStatement stmt = (PreparedStatement) this.friendsConnection.prepareStatement(query);
+            ResultSet rs = stmt.executeQuery();
+            while(rs.next()) {
+                String relation = rs.getString("relation");
+                if(relation.equals("0") || relation.equals("2")) {
+                    continue;
+                }
+                String myUuid = rs.getString("myUuid");
+                String friendUuid = rs.getString("friendUuid");
+                if(friends.containsKey(myUuid)) {
+                    ArrayList<String> friendList = (ArrayList<String>) friends.get(myUuid);
+                    friendList.add(friendUuid);
+                    friends.put(myUuid,friendList);
+                }
+                if(friends.containsKey(friendUuid)) {
+                    ArrayList<String> friendList = (ArrayList<String>) friends.get(friendUuid);
+                    friendList.add(myUuid);
+                    friends.put(friendUuid,friendList);
+                }
+            }
+            return friends;
+        } catch (SQLException ex) {
+            Logger.getLogger(friendsTableManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+    
+    /**
+     * API to fetch all friends of friends of myUuid. Additionally it fetches only 
+     * @param uuids
+     * @param myUuid
+     * @return 
+     */
+    public Hashtable getMultipleNonFriends(ArrayList<String> uuids, String myUuid) {
+        Hashtable nonFriends = new Hashtable();
+        Hashtable allFriends = this.getMultipleFriends(uuids);
+        Hashtable friendsHash = new Hashtable();
+        for(int i=0,max=uuids.size();i<max;i++) {
+            friendsHash.put(uuids.get(i), 1);
+        }
+        for(int i=0,max=uuids.size();i<max;i++) {
+            if(allFriends.containsKey(uuids.get(i))) {
+                
+            }
+        }
+        return nonFriends;
+    }
 
     /**
      * Unused API. DO NOT USE this API since it is not friendly for caching
@@ -378,4 +451,5 @@ public class friendsTableManager extends sqlUtils {
         }
         return friends;
     }
+    
 }

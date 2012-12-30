@@ -16,11 +16,12 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.InvalidPropertiesFormatException;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javanb.userpackage.userException;
+import net.sf.json.JSONObject;
 import net.spy.memcached.MemcachedClient;
 import org.apache.commons.codec.binary.Hex;
 
@@ -44,12 +45,15 @@ public class sqlUtils {
     private MemcachedClient memcachedClient;
     private final int expirationMemcached = 3600;
     
+    protected ExecutorService executorService = null;
+
     protected class setMemcache implements Runnable {
+
         private MemcachedClient memcachedClient;
         private String key;
         private CachedRowSetImpl cache;
         private int expirationMemcached;
-        
+
         public setMemcache(MemcachedClient client, String key, CachedRowSetImpl cache, int exp) {
             this.memcachedClient = client;
             this.key = key;
@@ -58,29 +62,29 @@ public class sqlUtils {
             Thread t = new Thread(this);
             t.start();
         }
-        
+
         @Override
         public void run() {
-            this.memcachedClient.set(this.key,this.expirationMemcached, this.cache);
+            this.memcachedClient.set(this.key, this.expirationMemcached, this.cache);
         }
     }
-    
+
     protected class deleteMemcache implements Runnable {
+
         private MemcachedClient memcachedClient;
         private String key;
-        
+
         public deleteMemcache(MemcachedClient client, String key) {
             this.memcachedClient = client;
             this.key = key;
             Thread t = new Thread(this);
             t.start();
         }
-        
+
         @Override
         public void run() {
             this.memcachedClient.delete(this.key);
         }
-        
     }
 
     public sqlUtils() throws FileNotFoundException, IOException, InvalidPropertiesFormatException {
@@ -99,6 +103,8 @@ public class sqlUtils {
 
         this.memcachedClientPort = 11211;
         this.memcachedClient = new MemcachedClient(new InetSocketAddress("localhost", this.memcachedClientPort));
+        
+        this.executorService = Executors.newFixedThreadPool(16); // should be configurable but limiting to 16 for now
     }
 
     public Connection getConnection() throws SQLException {
@@ -125,11 +131,13 @@ public class sqlUtils {
     }
 
     /**
-     * executes the sql query. First checks if the result is cached in memcache. If not issues a db call and caches the result
+     * executes the sql query. First checks if the result is cached in memcache.
+     * If not issues a db call and caches the result
+     *
      * @param stmt
      * @return
      * @throws userException
-     * @throws SQLException 
+     * @throws SQLException
      */
     protected ResultSet executeQuery(PreparedStatement stmt) throws userException, SQLException {
         String key = "";
@@ -151,9 +159,10 @@ public class sqlUtils {
 
     /**
      * generates md5sum of the sql query
+     *
      * @param stmt - prepared statement for which unique key is to be generated
      * @return md5sum as a string
-     * @throws userException 
+     * @throws userException
      */
     protected String generateKeyForMemcached(PreparedStatement stmt) throws userException {
         String query = stmt.toString();
@@ -176,55 +185,105 @@ public class sqlUtils {
 
     /**
      * Spawns a thread to set the value in memcached
+     *
      * @param key - key in memcached
      * @param rs - value in memcached
      */
     protected void cacheResult(String key, CachedRowSetImpl rs) {
-//        this.memcachedClient.set(key,this.expirationMemcached,rs);
         new setMemcache(this.memcachedClient, key, rs, this.expirationMemcached);
     }
 
     /**
-     * Spawna a thread to delete the key in memcached
-     * @param stmt - prepared stmt whose corresponding key is to be deleted from memcached
-     * @throws userException 
+     * Spawns a thread to delete the key in memcached
+     *
+     * @param stmt - prepared stmt whose corresponding key is to be deleted from
+     * memcached
+     * @throws userException
      */
     protected void invalidateCache(PreparedStatement stmt) throws userException {
         String key = this.generateKeyForMemcached(stmt);
         new deleteMemcache(this.memcachedClient, key);
-//        this.memcachedClient.delete(key);
     }
-    
+
     /**
-     * API to invalidate cache for a bulk of preparedstatements. Calls invalidateCache API for individual statements
+     * API to invalidate cache for a bulk of preparedstatements. Calls
+     * invalidateCache API for individual statements
+     *
      * @param stmt - array of preparedStatements
-     * @throws userException 
+     * @throws userException
      */
     protected void invalidateCache(PreparedStatement[] stmt) throws userException {
-        for(int i=0,max=stmt.length;i<max;i++) {
+        for (int i = 0, max = stmt.length; i < max; i++) {
             this.invalidateCache(stmt[i]);
         }
     }
-    
+
     /**
-     * API that constructs preparedstatement assuming all replacements are strings. DO NOT USE this in case
-     * replacements are of other type
+     * API that constructs preparedstatement assuming all replacements are
+     * strings. DO NOT USE this in case replacements are of other type
+     *
      * @param c - connection to db
      * @param query - sql query
      * @param replacements - replacements e.g for where clause
-     * @return 
+     * @return
      */
     protected PreparedStatement getPreparedStatement(Connection c, String query, String replacements) {
         try {
             String[] replacementsArray = replacements.split(",");
             PreparedStatement stmt = (PreparedStatement) c.prepareStatement(query);
-            for(int i=0,max=replacementsArray.length;i<max;i++) {
-                stmt.setString(i+1, replacementsArray[i]);
+            for (int i = 0, max = replacementsArray.length; i < max; i++) {
+                stmt.setString(i + 1, replacementsArray[i]);
             }
             return stmt;
         } catch (SQLException ex) {
             Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
         }
         return null;
+    }
+
+    /**
+     * API to execute multiple queries parallely. It uses the thread pool to execute queries in threads
+     * @param stmts - arraylist of prepared statements to be executed
+     * @return hashtable of results with keys being the query
+     * @throws userException 
+     */
+    protected Hashtable<String, ResultSet> executeMultipleQueries(ArrayList<PreparedStatement> stmts) throws userException {
+        try {
+            ArrayList<Callable<Hashtable<String, ResultSet>>> callables = new ArrayList<Callable<Hashtable<String, ResultSet>>>();
+            for (PreparedStatement stmt : stmts) {
+                final PreparedStatement statement = stmt;
+                Callable<Hashtable<String, ResultSet>> callable = new Callable<Hashtable<String, ResultSet>>() {
+
+                    @Override
+                    public Hashtable<String, ResultSet> call() throws userException, SQLException {
+                        ResultSet rs = sqlUtils.this.executeQuery(statement);
+                        Hashtable<String, ResultSet> result = new Hashtable<String, ResultSet>();
+                        result.put(statement.toString(), rs);
+                        return result;
+                    }
+                };
+                callables.add(callable);
+            }
+
+            ArrayList<Future<Hashtable<String, ResultSet>>> futuresList = new ArrayList<Future<Hashtable<String, ResultSet>>>();
+            futuresList = (ArrayList<Future<Hashtable<String, ResultSet>>>) this.executorService.invokeAll(callables);
+            Hashtable<String, ResultSet> multipleQueryResult = new Hashtable<String, ResultSet>();
+            for (Future<Hashtable<String, ResultSet>> future : futuresList) {
+                try {
+                    Hashtable result = future.get();
+                    Enumeration keys = result.keys();
+                    while (keys.hasMoreElements()) {
+                        String key = (String) keys.nextElement();
+                        ResultSet rs = (ResultSet) result.get(key);
+                        multipleQueryResult.put(key, rs);
+                    }
+                } catch (ExecutionException ex) {
+                    throw new userException("error occured while executing query : " + ex.getMessage());
+                }
+            }
+            return multipleQueryResult;
+        } catch (InterruptedException ex) {
+            throw new userException("error occured while executing query : " + ex.getMessage());
+        }
     }
 }

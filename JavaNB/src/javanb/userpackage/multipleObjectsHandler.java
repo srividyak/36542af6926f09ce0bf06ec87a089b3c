@@ -59,4 +59,5 @@ public class multipleObjectsHandler {
         JSONArray result = new JSONArray();
         return result;
     }
+    
 }

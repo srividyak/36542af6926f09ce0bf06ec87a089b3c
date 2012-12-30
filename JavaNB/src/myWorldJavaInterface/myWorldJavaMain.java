@@ -23,6 +23,7 @@ import javanb.userpackage.userException;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.sf.json.JSONSerializer;
+import sqlManager.UGCThreads.boardManager;
 
 /**
  *
@@ -137,8 +138,15 @@ public class myWorldJavaMain {
     }
     
     public void getAllFriends(String uuid) throws userException {
-        friends friends = new friends("06524f6541f83b817bf2f793a0a4ae04");
-        
+        try {
+            boardManager b = new boardManager();
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(myWorldJavaMain.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(myWorldJavaMain.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(myWorldJavaMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     
 }
