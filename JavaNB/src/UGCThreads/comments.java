@@ -7,8 +7,6 @@ package UGCThreads;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javanb.userpackage.userException;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
@@ -40,8 +38,9 @@ public class comments extends thread {
 
     /**
      * API to post comment under board/comment
+     *
      * @param commentDetails
-     * @throws userException 
+     * @throws userException
      */
     public void insertComment(JSONObject commentDetails) throws userException {
         try {
@@ -67,7 +66,7 @@ public class comments extends thread {
         }
     }
 
-    private void initComment(JSONObject commentDetails) throws userException {
+    public void initComment(JSONObject commentDetails) throws userException {
         this.initThread(commentDetails);
         if (commentDetails.containsKey("parentId")) {
             this.setParentId(commentDetails.getString("parentId"));
@@ -87,10 +86,11 @@ public class comments extends thread {
 
     /**
      * API to get comments under a comment
+     *
      * @param start offset
      * @param count
      * @return
-     * @throws userException 
+     * @throws userException
      */
     public JSONArray getComments(int start, int count) throws userException {
         try {
@@ -106,13 +106,75 @@ public class comments extends thread {
             throw new userException("error occured while fetching comments:" + ex.getMessage());
         }
     }
-    
+
     /**
      * API to fetch default num of comments from 0
+     *
      * @return
-     * @throws userException 
+     * @throws userException
      */
     public JSONArray getComments() throws userException {
         return this.getComments(0, 10);
+    }
+
+    /**
+     * API to update fields of comment (title/description/like/dislike etc)
+     * @param uuid
+     * @param obj
+     * @throws userException
+     */
+    public void updateComment(JSONObject obj) throws userException {
+        try {
+            commentsManager sqlManager = new commentsManager();
+            if (obj.containsKey("like")) {
+                if (obj.getString("like").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "likeRating", "1") == 1) {
+                        sqlManager.likeThread(commentId, "comment", "commentId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "likeRating", "0") == 1) {
+                        sqlManager.likeThread(commentId, "comment", "commentId", false);
+                    }
+                }
+            } else if (obj.containsKey("dislike")) {
+                if (obj.getString("dislike").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "likeRating", "2") == 1) {
+                        sqlManager.dislikeThread(commentId, "comment", "commentId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "likeRating", "0") == 1) {
+                        sqlManager.dislikeThread(commentId, "comment", "commentId", false);
+                    }
+                }
+            } else if (obj.containsKey("share")) {
+                if (obj.getString("share").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "share", "1") == 1) {
+                        sqlManager.shareThread(commentId, "comment", "commentId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "share", "0") == 1) {
+                        sqlManager.shareThread(commentId, "comment", "commentId", false);
+                    }
+                }
+            } else if (obj.containsKey("abuse")) {
+                if (obj.getString("abuse").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "abuse", "1") == 1) {
+                        sqlManager.abuseThread(commentId, "comment", "commentId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(commentId, obj.getString("uuid"), "abuse", "0") == 1) {
+                        sqlManager.abuseThread(commentId, "comment", "commentId", false);
+                    }
+                }
+            } else {
+                sqlManager.updateThread(commentId, "comment", "commentId", obj);
+            }
+        } catch (FileNotFoundException ex) {
+            throw new userException("error occured while updating comments:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("error occured while updating comments:" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("error occured while updating comments:" + ex.getMessage());
+        }
     }
 }

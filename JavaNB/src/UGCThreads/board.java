@@ -25,6 +25,7 @@ public class board extends thread {
     private Hashtable typeMap;
     private String content;
     private String boardId;
+    private String targetUuid; //indicates where the user wants to post. This can be equal to creatorUuid/other's uuid/pageId/groupId etc
 
     public String getBoardId() {
         return boardId;
@@ -51,9 +52,10 @@ public class board extends thread {
 
     /**
      * API to fetch a board given boardId
+     *
      * @param boardId
      * @return
-     * @throws userException 
+     * @throws userException
      */
     public JSONObject fetchBoard(String boardId) throws userException {
         try {
@@ -76,12 +78,12 @@ public class board extends thread {
 
     /**
      * API to insert a board
+     *
      * @param boardDetails
-     * @throws userException 
+     * @throws userException
      */
     public void insertBoard(JSONObject boardDetails) throws userException {
         try {
-            this.threadId = this.generateThreadId("board_");
             this.initBoard(boardDetails);
             boardDetails.put("threadId", this.threadId);
             boardDetails.put("timestamp", this.timestamp);
@@ -106,10 +108,11 @@ public class board extends thread {
 
     /**
      * API to init all local class params from boardDetails
+     *
      * @param boardDetails
-     * @throws userException 
+     * @throws userException
      */
-    private void initBoard(JSONObject boardDetails) throws userException {
+    public void initBoard(JSONObject boardDetails) throws userException {
         this.initThread(boardDetails);
         if (boardDetails.containsKey("type")) {
             this.setType(boardDetails.getString("type"));
@@ -121,11 +124,30 @@ public class board extends thread {
         } else {
             this.setContent("");
         }
+        if (boardDetails.containsKey("targetUuid")) {
+            this.setTargetUuid(boardDetails.getString("targetUuid"));
+        } else {
+            this.setTargetUuid(this.creatorUuid);
+        }
+        if (boardDetails.containsKey("boardId")) {
+            this.setThreadId(boardDetails.getString("boardId"));
+        } else {
+            this.setThreadId(this.generateThreadId("board_"));
+        }
         this.setBoardId(this.threadId);
+    }
+
+    public String getTargetUuid() {
+        return targetUuid;
+    }
+
+    public void setTargetUuid(String targetUuid) {
+        this.targetUuid = targetUuid;
     }
 
     /**
      * API to init the board id
+     *
      * @return boardId
      */
     public String generateBoardId() {
@@ -146,10 +168,11 @@ public class board extends thread {
 
     /**
      * gets comments for a board (JSONObject notation of n-ary tree)
+     *
      * @param start offset for comments
      * @param count num of comments
      * @return
-     * @throws userException 
+     * @throws userException
      */
     public JSONObject getComments(int start, int count) throws userException {
         try {
@@ -164,9 +187,11 @@ public class board extends thread {
     }
 
     /**
-     * gets comments for a board (JSONObject notation of n-ary tree). offset is 0 and count being 10
+     * gets comments for a board (JSONObject notation of n-ary tree). offset is
+     * 0 and count being 10
+     *
      * @return
-     * @throws userException 
+     * @throws userException
      */
     public JSONObject getComments() throws userException {
         try {
@@ -177,6 +202,61 @@ public class board extends thread {
             throw new userException("could not fetch comments for this id:" + ex.getMessage());
         } catch (SQLException ex) {
             throw new userException("could not fetch comments for this id:" + ex.getMessage());
+        }
+    }
+
+    public void updateBoard(JSONObject obj) throws userException {
+        try {
+            boardManager sqlManager = new boardManager();
+            if (obj.containsKey("like")) {
+                if (obj.getString("like").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "likeRating", "1") == 1) {
+                        sqlManager.likeThread(boardId, "board", "boardId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "likeRating", "0") == 1) {
+                        sqlManager.likeThread(boardId, "board", "boardId", false);
+                    }
+                }
+            } else if (obj.containsKey("dislike")) {
+                if (obj.getString("dislike").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "likeRating", "2") == 1) {
+                        sqlManager.dislikeThread(boardId, "board", "boardId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "likeRating", "0") == 1) {
+                        sqlManager.dislikeThread(boardId, "board", "boardId", false);
+                    }
+                }
+            } else if (obj.containsKey("share")) {
+                if (obj.getString("share").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "share", "1") == 1) {
+                        sqlManager.shareThread(boardId, "board", "boardId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "share", "0") == 1) {
+                        sqlManager.shareThread(boardId, "board", "boardId", false);
+                    }
+                }
+            } else if (obj.containsKey("abuse")) {
+                if (obj.getString("abuse").equals("1")) {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "abuse", "1") == 1) {
+                        sqlManager.abuseThread(boardId, "board", "boardId", true);
+                    }
+                } else {
+                    if (sqlManager.updateThreadInRatings(boardId, obj.getString("uuid"), "abuse", "0") == 1) {
+                        sqlManager.abuseThread(boardId, "board", "boardId", false);
+                    }
+                }
+            } else {
+                sqlManager.updateThread(boardId, "board", "boardId", obj);
+            }
+        } catch (FileNotFoundException ex) {
+            throw new userException("error occured while updating comments:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("error occured while updating comments:" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("error occured while updating comments:" + ex.getMessage());
         }
     }
 }

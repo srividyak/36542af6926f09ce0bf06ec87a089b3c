@@ -31,6 +31,9 @@ public class JavaNB {
     public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException {
         // TODO code application logic here
         myWorldJavaMain myWorld = new myWorldJavaMain();
-        myWorld.getAllFriends("0fccd71a31ac5da989948b822ed8846b");
+        user u = new user("31f8570f305a0c69872e1f6a96066db1");
+        String info = "{uuid:'31f8570f305a0c69872e1f6a96066db1',firstName:'Srividya',lastName:'krishnamurthy',middleName:'',dob:'1989-03-19',phoneNum:'9900810028',lang:'kannada,english,hindi',locations:[{id:'bengaluru'}],homeTown:'bengaluru',email:'vidya.vasishtha5@gmail.com'}";
+        JSONObject userDetails = (JSONObject) JSONSerializer.toJSON(info);
+        u.updateUser(userDetails);
     }
 }

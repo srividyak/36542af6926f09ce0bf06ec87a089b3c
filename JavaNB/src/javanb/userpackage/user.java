@@ -4,9 +4,9 @@
  */
 package javanb.userpackage;
 
+import entity.entity;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -21,17 +21,16 @@ import javanb.locationpackage.location;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.sf.json.JSONSerializer;
-import sqlManager.userTableManager;
 import org.apache.commons.codec.digest.DigestUtils;
 import sqlManager.friendsTableManager;
+import sqlManager.userTableManager;
 
 /**
  *
  * @author srivid
  */
-public class user {
+public class user extends entity {
 
-    private String uuid;
     private String firstName;
     private String middleName;
     private String lastName;
@@ -73,33 +72,35 @@ public class user {
 
     public user() {
     }
-    
+
     /*
-     * Provides this constructor to accept an existing uuid. This can be used to update/set fields in user table
+     * Provides this constructor to accept an existing uuid. This can be used to
+     * update/set fields in user table
      */
     public user(String uuidString) {
         this.setUuid(uuidString);
     }
 
-    public void fetchUser(String _uuidString) throws userException {
+    @Override
+    public void fetchEntity() throws userException {
         try {
-            userTableManager tableMgr = new userTableManager(_uuidString);
+            userTableManager tableMgr = new userTableManager(this.getUuid());
             JSONObject userDetails = tableMgr.getUserDetails();
-            this.setUuid(_uuidString);
             this.initUser(userDetails);
         } catch (ParseException ex) {
-            throw new userException("error while fetching user"+ex.getMessage());
+            throw new userException("error while fetching user" + ex.getMessage());
         } catch (userException ex) {
-            throw new userException("error while fetching user"+ex.getMessage());
+            throw new userException("error while fetching user" + ex.getMessage());
         } catch (FileNotFoundException ex) {
-            throw new userException("error while fetching user"+ex.getMessage());
+            throw new userException("error while fetching user" + ex.getMessage());
         } catch (IOException ex) {
-            throw new userException("error while fetching user"+ex.getMessage());
+            throw new userException("error while fetching user" + ex.getMessage());
         } catch (SQLException ex) {
-            throw new userException("error while fetching user"+ex.getMessage());
+            System.err.println(ex.getErrorCode() + "state:" + ex.getSQLState());
+            throw new userException("error while fetching user" + ex.getMessage());
         }
     }
-    
+
     public void insertUser(JSONObject userInfo) throws userException {
         try {
             this.initUser(userInfo);
@@ -107,13 +108,13 @@ public class user {
             userInfo.put("uuid", this.getUuid());
             userTableManager newUser = new userTableManager(userInfo);
         } catch (FileNotFoundException ex) {
-            throw new userException("error while inserting user"+ex.getMessage());
+            throw new userException("error while inserting user" + ex.getMessage());
         } catch (IOException ex) {
-            throw new userException("error while inserting user"+ex.getMessage());
+            throw new userException("error while inserting user" + ex.getMessage());
         } catch (SQLException ex) {
-            throw new userException("error while inserting user"+ex.getMessage());
+            throw new userException("error while inserting user" + ex.getMessage());
         } catch (ParseException ex) {
-            throw new userException("error while inserting user"+ex.getMessage());
+            throw new userException("error while inserting user" + ex.getMessage());
         }
     }
 
@@ -139,9 +140,10 @@ public class user {
         userDetails.put("timestamp", this.timestamp);
         return userDetails;
     }
-    
+
     /*
-     * API which takes in a jsonobj of user details and initializes the user object
+     * API which takes in a jsonobj of user details and initializes the user
+     * object
      */
     public void loadUser(JSONObject userInfo) throws userException {
         try {
@@ -369,10 +371,6 @@ public class user {
         this.relStatus = relStatus;
     }
 
-    public void setUuid(String uuid) {
-        this.uuid = uuid;
-    }
-
     public String getAbout() {
         return about;
     }
@@ -433,10 +431,6 @@ public class user {
         return relStatus;
     }
 
-    public String getUuid() {
-        return uuid;
-    }
-
     public void sendRequest(String friendUuid) throws userException {
         try {
             friendsTableManager sqlManager = new friendsTableManager();
@@ -476,20 +470,44 @@ public class user {
         }
     }
 
-    //to update any field use static methods
-    public static void updateStringField(String uuidString, String field, String value) throws FileNotFoundException, IOException, SQLException, userException {
-        field = field.trim();
-        userTableManager sqlManager = new userTableManager();
-        sqlManager.updateStringField(uuidString, field, value);
+    public void updateUser(JSONObject userDetails) throws userException {
+        try {
+            if (this.uuid == null) {
+                if (!userDetails.containsKey("uuid")) {
+                    throw new userException("You are trying to update user without uuid. Update user of particular uuid");
+                } else {
+                    this.setUuid(userDetails.getString("uuid"));
+                }
+            }
+            if(userDetails.containsKey("timestamp")) {
+                userDetails.remove("timestamp");
+            }
+            if(userDetails.containsKey("uuid")) {
+                userDetails.remove("uuid");
+            }
+            userTableManager sqlManager = new userTableManager();
+            sqlManager.updateUser(uuid, userDetails);
+        } catch (FileNotFoundException ex) {
+            throw new userException("error occured while updating user:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("error occured while updating user:" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("error occured while updating user:" + ex.getMessage());
+        }
     }
-
-    public static void updateDob(String uuid, String date) throws ParseException, FileNotFoundException, IOException, SQLException, userException {
-        userTableManager sqlManager = new userTableManager();
-        sqlManager.updateDob(uuid, date);
-    }
-
-    public static void updateGender(String uuid, boolean gender) throws ParseException, FileNotFoundException, IOException, SQLException, userException {
-        userTableManager sqlManager = new userTableManager();
-        sqlManager.updateGender(uuid, gender);
+    
+    public void deleteUser() throws userException {
+        try {
+            userTableManager sqlManager = new userTableManager();
+            JSONObject obj = new JSONObject();
+            obj.put("disabled","1");
+            sqlManager.updateUser(uuid, obj);
+        } catch (FileNotFoundException ex) {
+            throw new userException("error while deleting/disabling user:" + ex.getMessage());
+        } catch (IOException ex) {
+            throw new userException("error while deleting/disabling user:" + ex.getMessage());
+        } catch (SQLException ex) {
+            throw new userException("error while deleting/disabling user:" + ex.getMessage());
+        }
     }
 }

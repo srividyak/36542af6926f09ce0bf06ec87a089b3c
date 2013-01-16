@@ -4,3 +4,6 @@
 *.jar
 *.war
 *.ear
+/MyWorldWebService/nbproject/private/
+/MyWorldWebService/build/
+/MyWorldWebService/dist/

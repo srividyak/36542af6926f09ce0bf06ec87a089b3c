@@ -4,16 +4,11 @@
  */
 package UGCThreads;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
 import javanb.userpackage.userException;
-import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.commons.codec.digest.DigestUtils;
-import sqlManager.UGCThreads.threadManager;
 
 /**
  *
@@ -130,44 +125,6 @@ public class thread {
         this.setThreadId(id);
     }
 
-    /**
-     * insert a thread (board/comment)
-     * @param threadDetails
-     * @throws userException 
-     */
-    public void insertThread(JSONObject threadDetails) throws userException {
-        try {
-            threadManager sqlManager = new threadManager();
-            sqlManager.insertThread(threadDetails);
-        } catch (FileNotFoundException ex) {
-            throw new userException("error occured while inserting comments:" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("error occured while inserting comments:" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("error occured while inserting comments:" + ex.getMessage());
-        }
-    }
-
-    public static void updateThreadInRatings(String uuid, String threadId, JSONObject obj) throws userException {
-        try {
-            threadManager sqlManager = new threadManager();
-            if (obj.containsKey("shareCount")) {
-                sqlManager.updateThreadInRatings(threadId, uuid, "shareCount", obj.getString("shareCount"));
-            } else if(obj.containsKey("upRatingsCount")) {
-                sqlManager.updateThreadInRatings(threadId, uuid, "upRatingsCount", obj.getString("upRatingsCount"));
-            }  else if(obj.containsKey("downRatingsCount")) {
-                sqlManager.updateThreadInRatings(threadId, uuid, "downRatingsCount", obj.getString("downRatingsCount"));
-            } else {
-                throw new userException("invalid parameter passed to update ratings table");
-            }
-        } catch (FileNotFoundException ex) {
-            throw new userException("error occured while inserting ratings:" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("error occured while inserting ratings:" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("error occured while inserting ratings:" + ex.getMessage());
-        }
-    }
     
     /**
      * generates md5sum of timestamp,title and description

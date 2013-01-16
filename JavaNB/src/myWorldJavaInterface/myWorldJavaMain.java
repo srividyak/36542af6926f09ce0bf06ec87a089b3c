@@ -4,17 +4,13 @@
  */
 package myWorldJavaInterface;
 
-import friends.friends;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javanb.basicUserData;
 import javanb.companypackage.company;
 import javanb.educationpackage.education;
 import javanb.locationpackage.location;
@@ -22,7 +18,6 @@ import javanb.userpackage.user;
 import javanb.userpackage.userException;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import net.sf.json.JSONSerializer;
 import sqlManager.UGCThreads.boardManager;
 
 /**
@@ -31,8 +26,8 @@ import sqlManager.UGCThreads.boardManager;
  */
 public class myWorldJavaMain {
     public JSONObject getUser(String uuid) throws userException {
-        user existingUser = new user();
-        existingUser.fetchUser(uuid);
+        user existingUser = new user(uuid);
+        existingUser.fetchEntity();
         return existingUser.getUserDetails();
     }
     
@@ -101,39 +96,21 @@ public class myWorldJavaMain {
     }
     
     public void updateUser(String uuid, JSONObject userDetails) throws ParseException, FileNotFoundException, IOException, SQLException, userException {
-        Iterator keys = userDetails.keys();
-        while(keys.hasNext()) {
-            String key = (String) keys.next();
-            if(key.equals("gender")) {
-                user.updateGender(uuid, userDetails.getBoolean(key));
-            } else if(key.equals("dob")) {
-                user.updateDob(uuid, userDetails.getString(key));
-            } else {
-                if(key.equals("educations")) {
-                    this.updateEducationTable(userDetails.getJSONArray("educations"));
-                }
-                if(key.equals("companies")) {
-                    this.updateCompaniesTable(userDetails.getJSONArray("companies"));
-                }
-                if(key.equals("locations")) {
-                    this.updateLocationsTable(userDetails.getJSONArray("locations"));
-                }
-                user.updateStringField(uuid, key, userDetails.getString(key));
-            }
-        }
+        user u = new user(uuid);
+        u.updateUser(userDetails);
     }
     
     public void sendRequest(String myUuid, String friendUuid) throws userException {
         user myUser;
-        myUser = new user();
-        myUser.fetchUser(myUuid);
+        myUser = new user(myUuid);
+        myUser.fetchEntity();
         myUser.sendRequest(friendUuid);
     }
     
     public void acceptRequest(String myUuid, String friendUuid) throws userException {
         user myUser;
-        myUser = new user();
-        myUser.fetchUser(myUuid);
+        myUser = new user(myUuid);
+        myUser.fetchEntity();
         myUser.acceptRequest(friendUuid);
     }
     

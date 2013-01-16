@@ -42,6 +42,16 @@ public class boardManager extends threadManager {
             this.data = data;
             childrenTable = new Hashtable<String, tree>();
         }
+        
+        public synchronized void deleteChildren() {
+            this.childrenTable = null;
+        }
+        
+        public synchronized void deleteChidlren(String key) {
+            if(this.childrenTable.contains(key)) {
+                this.childrenTable.remove(key);
+            }
+        }
 
         public synchronized void addChildren(Hashtable children) {
             this.childrenTable = new Hashtable<String, tree>();
@@ -502,7 +512,7 @@ public class boardManager extends threadManager {
      * @return
      * @throws userException 
      */
-    public JSONArray getBoardsOfUser(String uuid) throws userException {
+    public JSONArray getBoardsOfEntity(String uuid) throws userException {
         try {
             JSONArray results = new JSONArray();
             String boardQuery = "select * from board where uuid=?";
@@ -556,4 +566,5 @@ public class boardManager extends threadManager {
             throw new userException("error occured while fetching boards:" + ex.getMessage());
         }
     }
+    
 }

@@ -655,7 +655,7 @@ public class friends {
                 @Override
                 public Object call() throws userException {
                     user me = new user(uuid);
-                    me.fetchUser(uuid);
+                    me.fetchEntity();
                     return me;
                 }
             };
