@@ -4,20 +4,16 @@
  */
 package javanb;
 
+import UGCThreads.links;
+import http.linkHandler;
+import http.linksCrawler;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URL;
 import java.sql.SQLException;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javanb.userpackage.user;
 import javanb.userpackage.userException;
-import myWorldJavaInterface.myWorldJavaMain;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
-import net.sf.json.JSONSerializer;
+import org.apache.commons.lang.StringUtils;
 
 /**
  *
@@ -28,12 +24,8 @@ public class JavaNB {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException {
+    public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException, Exception {
         // TODO code application logic here
-        myWorldJavaMain myWorld = new myWorldJavaMain();
-        user u = new user("31f8570f305a0c69872e1f6a96066db1");
-        String info = "{uuid:'31f8570f305a0c69872e1f6a96066db1',firstName:'Srividya',lastName:'krishnamurthy',middleName:'',dob:'1989-03-19',phoneNum:'9900810028',lang:'kannada,english,hindi',locations:[{id:'bengaluru'}],homeTown:'bengaluru',email:'vidya.vasishtha5@gmail.com'}";
-        JSONObject userDetails = (JSONObject) JSONSerializer.toJSON(info);
-        u.updateUser(userDetails);
+        links l = new links(new URL("http://www.vogella.com/articles/JavaRegularExpressions/article.html"), "6a05b8829cbad91c53796337002b83c6");
     }
 }

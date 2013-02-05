@@ -1,0 +1,17 @@
+* Boards:
+	* type
+		* 0 => text msg
+		* 1 => image
+		* 2 => video
+		* 3 => link
+	* Links:
+		* Content may consist of imageUrls/url etc
+			* url => url of link
+			* imageUrl => comma separated image urls
+		* title: title of the link
+		* description: desc of the link
+		* tags: use keywords, title, desc and remove stop words from these and add remaining ones as tags
+	
+
+* news feed:
+	

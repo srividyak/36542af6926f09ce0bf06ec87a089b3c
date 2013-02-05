@@ -7,10 +7,7 @@ package UGCThreads;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Date;
 import java.util.Hashtable;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javanb.userpackage.userException;
 import net.sf.json.JSONObject;
 import sqlManager.UGCThreads.boardManager;
@@ -87,6 +84,7 @@ public class board extends thread {
             this.initBoard(boardDetails);
             boardDetails.put("threadId", this.threadId);
             boardDetails.put("timestamp", this.timestamp);
+            boardDetails.put("targetUuid", this.getTargetUuid());
             String tags = "";
             if (this.tags != null) {
                 for (String tag : this.tags) {
