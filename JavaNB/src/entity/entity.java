@@ -6,6 +6,7 @@ package entity;
 
 import UGCThreads.board;
 import UGCThreads.comments;
+import UGCThreads.page;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -61,8 +62,10 @@ public class entity {
         c.updateComment(commentDetails);
     }
     
-    public void createPage(JSONObject pageDetails) {
-        
+    public void createPage(JSONObject pageDetails) throws userException {
+        page p = new page();
+        pageDetails.put("owner", this.uuid);
+        p.insertPage(pageDetails);
     }
     
     public void updatePage(JSONObject pageDetails) {

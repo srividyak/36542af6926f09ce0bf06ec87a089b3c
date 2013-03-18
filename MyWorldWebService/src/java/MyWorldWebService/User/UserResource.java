@@ -4,6 +4,14 @@
  */
 package MyWorldWebService.User;
 
+import MyWorldWebService.jsonRenderer;
+import UGCThreads.board;
+import entity.entity;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javanb.userpackage.user;
 import javanb.userpackage.userException;
 import javax.ws.rs.*;
@@ -27,6 +35,21 @@ public class UserResource {
      * Creates a new instance of UserResource
      */
     public UserResource() {
+    }
+
+    @GET
+    @Produces("application/json")
+    @Path("/boards")
+    public String getBoards(@QueryParam("uuid") String uuid, @QueryParam("offset") int offset, @QueryParam("count") int count) {
+        entity entity = new entity();
+        entity.setUuid(uuid);
+        try {
+            List<board> list = entity.getAllBoards();
+            return jsonRenderer.toJSON(list);
+        } catch (userException ex) {
+            Logger.getLogger(UserResource.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return "";
     }
 
     /**

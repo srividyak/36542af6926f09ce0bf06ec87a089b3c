@@ -150,7 +150,7 @@ public class linkHandler {
             this.anchors = new HashSet<URL>();
             this.extractLink();
         } catch (Exception ex) {
-            throw new userException("error occured while extracting link:" + ex.getMessage());
+            throw new userException("error occured while extracting link:" + url.toString() + "," + ex.getMessage());
         }
     }
 
@@ -351,7 +351,7 @@ public class linkHandler {
                                 }
                             }
                         }
-                    } else if ( node.getTag() != null && node.getTag().equals("meta")) {
+                    } else if (node.getTag() != null && node.getTag().equals("meta")) {
                         String data = node.getData();
                         String descReg1 = "meta\\s+(name=\\s*[\"]?[d|D]escription[\"]?)\\s+content=[\"]?(.*)[\"]?";
                         String descReg2 = "meta\\s+content=\\s*[\"]?(.*)[\"]?\\s+(name=[\"]?[d|D]escription[\"]?)";
@@ -399,8 +399,12 @@ public class linkHandler {
                         Pattern pattern = Pattern.compile(regex);
                         Matcher matcher = pattern.matcher(data);
                         while (matcher.find()) {
-                            URL href = new URL(this.url, matcher.group(1));
-                            this.anchors.add(href);
+                            try {
+                                URL href = new URL(this.url, matcher.group(1));
+                                this.anchors.add(href);
+                            } catch (Exception e) {
+                                //do nothing
+                            }
                         }
                     }
                 }

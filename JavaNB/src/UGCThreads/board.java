@@ -257,4 +257,24 @@ public class board extends thread {
             throw new userException("error occured while updating comments:" + ex.getMessage());
         }
     }
+    
+    @Override
+    public JSONObject toJSON() {
+        JSONObject json;
+        json = super.toJSON();
+        if(this.type != null) {
+            json.put("type", this.type);
+        }
+        if(this.content != null) {
+            json.put("content", content);
+        }
+        json.put("boardId", boardId);
+        json.put("targetUuid", targetUuid);
+        return json;
+    }
+    
+    @Override
+    public String toString() {
+        return this.toJSON().toString();
+    }
 }

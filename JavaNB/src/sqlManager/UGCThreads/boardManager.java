@@ -4,9 +4,7 @@
  */
 package sqlManager.UGCThreads;
 
-import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
-import com.sun.rowset.CachedRowSetImpl;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -14,8 +12,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javanb.customQueue;
 import javanb.userpackage.userException;
 import net.sf.json.JSONArray;
@@ -301,6 +297,7 @@ public class boardManager extends threadManager {
      * @throws userException 
      */
     public JSONObject getComments(String boardId, int start, int count) throws userException {
+        //TODO: cant pass null reference and expect function to populate it correctly
         tree root = null;
         this.initComments(boardId, start, count, root);
         return (root != null) ? root.toJSON(root) : null;

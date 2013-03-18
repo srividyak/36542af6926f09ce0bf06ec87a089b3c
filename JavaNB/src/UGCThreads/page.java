@@ -19,6 +19,19 @@ public class page extends groupThread {
     private long shareCount;
     private long upRatingsCount;
     private long downRatingsCount;
+    
+    public JSONObject toJSON() {
+        JSONObject json = super.toJSON();
+        json.put("shareCount", shareCount);
+        json.put("upRatingsCount", upRatingsCount);
+        json.put("downRatingsCount", downRatingsCount);
+        return json;
+    }
+    
+    @Override
+    public String toString() {
+        return this.toJSON().toString();
+    }
 
     public long getDownRatingsCount() {
         return downRatingsCount;

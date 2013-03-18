@@ -14,6 +14,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javanb.basicEducationData;
 import javanb.basicUserData;
+import javanb.trie;
+import javanb.trieNode;
 import javanb.userpackage.multipleObjectsHandler;
 import javanb.userpackage.user;
 import javanb.userpackage.userException;
@@ -59,48 +61,11 @@ public class friends {
         }
     }
 
-    private class friendsTrie {
-
-        public char alphabet;
-        public int childCount = 0;
-        public ArrayList<friendsTrie> children = null;
-        public boolean end = false;
-        public String uuid = null;
-        private int childPointer = 0;
-
-        public friendsTrie(char name) {
-            this.alphabet = name;
-        }
-
-        public void setEnd(String friend) {
-            this.end = true;
-            this.uuid = friend;
-        }
-
-        public void addChild(friendsTrie child) {
-            if (this.childCount == 0) {
-                this.children = new ArrayList<friendsTrie>();
-            }
-            this.children.add(child);
-            this.childCount++;
-        }
-
-        //use this API when there is a need to iterate through the trie. Eg: while doing BFS/DFS
-        public friendsTrie getNextChild() {
-            if (this.childPointer < this.childCount) {
-                return this.children.get(this.childPointer++);
-            }
-            return null;
-        }
-
-        public void resetChildPtr() {
-            this.childPointer = 0;
-        }
-    }
     protected networkBlob myNetwork = null;
-    protected friendsTrie firstNameTrie = null;
-    protected friendsTrie lastNameTrie = null;
-    protected friendsTrie middleNameTrie = null;
+    
+    protected trie firstnameCommonTrie = null;
+    protected trie middlenameCommonTrie = null;
+    protected trie lastnameCommonTrie = null;
 
     public String getUuid() {
         return uuid;
@@ -442,191 +407,58 @@ public class friends {
 
     }
 
-    /*
-     * API to load all 3 types of trie. Uses top viewed friends as the parameter
-     * uses multiple users to fetch bunch of users data in one call
-     */
-    public void loadTries() throws userException {
-        this.firstNameTrie = new friendsTrie('#');
-        this.lastNameTrie = new friendsTrie('#');
-        this.middleNameTrie = new friendsTrie('#');
-        System.out.println("before fetch:" + new Date().getTime());
-        ArrayList<String> topViewedFriends = this.getTopViewed();
-        System.out.println("after fetching friends uuid:" + new Date().getTime());
-        ArrayList<user> users = multipleObjectsHandler.getUsers(topViewedFriends);
-        System.out.println("after fetching users:" + new Date().getTime());
-        for (int i = 0, max = users.size(); i < max; i++) {
-            user me = users.get(i);
-            this.addNameIntoFriendsTrie(me.getFirstName(), topViewedFriends.get(i), "firstName");
-            this.addNameIntoFriendsTrie(me.getLastName(), topViewedFriends.get(i), "lastName");
-            this.addNameIntoFriendsTrie(me.getMiddleName(), topViewedFriends.get(i), "middleName");
-        }
-        this.trieFlag = true;
-    }
-
-    /*
-     * populates namesArray with the matched names. When a partial name has been
-     * matched, this API can be used to auto complete the search results @param
-     * namesArray - this JSONArray is populated with matched results at the end
-     * of the function @param prefix - partially matched string @param root -
-     * the trie in which search is to be performed
-     */
-    private void populateSearchFriendsObject(JSONArray namesArray, String prefix, friendsTrie root) {
-        ArrayList<friendsTrie> stack = new ArrayList<friendsTrie>();
-        stack.add(root);
-        String suffix = "";
-        while (stack.size() != 0) {
-            friendsTrie curNode = (stack.get(stack.size() - 1)).getNextChild();
-            if (curNode != null) {
-                suffix += curNode.alphabet;
-                if (curNode.end) {
-                    JSONObject nameObject = new JSONObject();
-                    nameObject.put("name", prefix + suffix);
-                    nameObject.put("uuid", curNode.uuid);
-                    namesArray.add(nameObject);
-                }
-                stack.add(curNode);
-            } else {
-                if (suffix.length() > 0) {
-                    suffix = suffix.substring(0, suffix.length() - 1);
-                }
-                //this resets the childpointer so that the entire trie is reusable after one pass
-                stack.get(stack.size() - 1).resetChildPtr();
-                stack.remove(stack.size() - 1);
-            }
-        }
-    }
-
-    /*
-     * API to parse a trie - does a DFS and prints out the contents of the trie.
-     * This is only for test @param trie - the trie to parse
-     */
-    public void parse(friendsTrie trie) {
-        ArrayList<friendsTrie> stack = new ArrayList<friendsTrie>();
-        stack.add(trie);
-        String name = "";
-        while (stack.size() != 0) {
-            friendsTrie curNode = (stack.get(stack.size() - 1)).getNextChild();
-            if (curNode != null) {
-                name += curNode.alphabet;
-                if (curNode.end) {
-                    System.out.println(name);
-                }
-                stack.add(curNode);
-            } else {
-                if (name.length() > 0) {
-                    name = name.substring(0, name.length() - 1);
-                }
-                stack.get(stack.size() - 1).resetChildPtr();
-                stack.remove(stack.size() - 1);
-            }
-        }
-    }
-
-    /*
-     * API to parse first name
-     */
-    public void parseFirstNameTrie() throws userException {
-        this.loadTries();
-        this.parse(this.firstNameTrie);
-    }
-
-    /*
-     * This API can be called to search for firstName,lastname and middlename
-     * starting with "name" @param name - initial characters to be searched for
-     * in trie This loads the trie just once. Hence same function can be called
-     * multiple times without fetching data repeatedly
-     */
-    public JSONObject searchFriends(String name) throws userException {
+    public JSONObject searchFriendsCommon(String name) throws userException {
         JSONObject friends = new JSONObject();
-        friends.put("firstName", new JSONArray());
-        friends.put("lastName", new JSONArray());
-        friends.put("middleName", new JSONArray());
-        if (!this.trieFlag) {
-            this.loadTries();
+        if (!trieFlag) {
+            this.firstnameCommonTrie = new trie();
+            this.lastnameCommonTrie = new trie();
+            this.middlenameCommonTrie = new trie();
+            ArrayList<String> topViewedFriends = this.getTopViewed();
+            ArrayList<user> users = multipleObjectsHandler.getUsers(topViewedFriends);
+            for (int i = 0, max = users.size(); i < max; i++) {
+                user me = users.get(i);
+                this.firstnameCommonTrie.addName(me.getFirstName(), topViewedFriends.get(i));
+                this.lastnameCommonTrie.addName(me.getLastName(), topViewedFriends.get(i));
+                this.middlenameCommonTrie.addName(me.getMiddleName(), topViewedFriends.get(i));
+            }
+            this.trieFlag = true;
         }
-        friendsTrie firstNameSearchNode = this.searchTrie(name, this.firstNameTrie);
-        friendsTrie lastNameSearchNode = this.searchTrie(name, this.lastNameTrie);
-        friendsTrie middleNameSearchNode = this.searchTrie(name, this.middleNameTrie);
-        ArrayList<friendsTrie> stack = new ArrayList<friendsTrie>();
-        if (firstNameSearchNode != null) {
-            JSONArray firstNameJSONArray = friends.getJSONArray("firstName");
-            this.populateSearchFriendsObject(firstNameJSONArray, name, firstNameSearchNode);
+        trieNode firstnameTrieNode = this.firstnameCommonTrie.searchName(name);
+        trieNode lastnameTrieNode = this.lastnameCommonTrie.searchName(name);
+        trieNode middlenameTrieNode = this.middlenameCommonTrie.searchName(name);
+        if(firstnameTrieNode != null) {
+            HashMap<String,Object> firstnameHashMap = this.firstnameCommonTrie.autocomplete(name, firstnameTrieNode);
+            JSONArray firstnameArray = new JSONArray();
+            for(Map.Entry<String,Object> entry : firstnameHashMap.entrySet()) {
+                JSONObject firstnameJSONObject = new JSONObject();
+                firstnameJSONObject.put(entry.getKey(), entry.getValue());
+                firstnameArray.add(firstnameJSONObject);
+            }
+            friends.put("firstName", firstnameArray);
         }
-        if (lastNameSearchNode != null) {
-            JSONArray lastNameJSONArray = friends.getJSONArray("lastName");
-            this.populateSearchFriendsObject(lastNameJSONArray, name, lastNameSearchNode);
+        
+        if(lastnameTrieNode != null) {
+            HashMap<String,Object> lastnameHashMap = this.lastnameCommonTrie.autocomplete(name, lastnameTrieNode);
+            JSONArray lastnameArray = new JSONArray();
+            for(Map.Entry<String,Object> entry : lastnameHashMap.entrySet()) {
+                JSONObject lastnameJSONObject = new JSONObject();
+                lastnameJSONObject.put(entry.getKey(), entry.getValue());
+                lastnameArray.add(lastnameJSONObject);
+            }
+            friends.put("lastName", lastnameArray);
         }
-        if (middleNameSearchNode != null) {
-            JSONArray middleNameJSONArray = friends.getJSONArray("middleName");
-            this.populateSearchFriendsObject(middleNameJSONArray, name, middleNameSearchNode);
+        
+        if(middlenameTrieNode != null) {
+            HashMap<String,Object> middlenameHashMap = this.middlenameCommonTrie.autocomplete(name, middlenameTrieNode);
+            JSONArray middlenameArray = new JSONArray();
+            for(Map.Entry<String,Object> entry : middlenameHashMap.entrySet()) {
+                JSONObject middlenameJSONObject = new JSONObject();
+                middlenameJSONObject.put(entry.getKey(), entry.getValue());
+                middlenameArray.add(middlenameJSONObject);
+            }
+            friends.put("middleName", middlenameArray);
         }
         return friends;
-    }
-
-    /*
-     * This API searches for name in thr trie. @param - name - name to be
-     * searched @param root - trie in which search is to be performed returns
-     * the pointer in the trie where the last character of name matched
-     */
-    private friendsTrie searchTrie(String name, friendsTrie root) {
-        friendsTrie ptr = root;
-        for (int i = 0, max = name.length(); i < max; i++) {
-            boolean found = false;
-            for (int j = 0, maxj = ptr.childCount; j < maxj; j++) {
-                if (ptr.children.get(j).alphabet == name.charAt(i)) {
-                    found = true;
-                    ptr = ptr.children.get(j);
-                    break;
-                }
-            }
-            if (!found) {
-                if (i != 0) {
-                    return ptr;
-                } else {
-                    return null;
-                }
-            }
-        }
-        return ptr;
-    }
-
-    /*
-     * API to populate the trie. Populates the trie with uuid in case end is
-     * reached @param name - name to be populated @param friendUuid - uuid of
-     * the user to be inserted at end @param nameType - indicates if name is
-     * first/last/middle name
-     *
-     */
-    private void addNameIntoFriendsTrie(String name, String friendUuid, String nameType) throws userException {
-        friendsTrie temp = null;
-        if (nameType.equals("firstName")) {
-            temp = this.firstNameTrie;
-        } else if (nameType.equals("lastName")) {
-            temp = this.lastNameTrie;
-        } else if (nameType.equals("middleName")) {
-            temp = this.middleNameTrie;
-        } else {
-            throw new userException("Invalid nameType passed");
-        }
-        for (int i = 0, max = name.length(); i < max; i++) {
-            int childCount = temp.childCount;
-            boolean found = false;
-            for (int j = 0; j < childCount; j++) {
-                if (temp.children.get(j).alphabet == name.charAt(i)) {
-                    found = true;
-                    temp = temp.children.get(j);
-                    break;
-                }
-            }
-            if (!found) {
-                temp.addChild(new friendsTrie(name.charAt(i)));
-                temp = temp.children.get(temp.childCount - 1);
-            }
-            if (i == max - 1) {
-                temp.setEnd(friendUuid);
-            }
-        }
     }
 
     /**
@@ -640,7 +472,7 @@ public class friends {
     public static ArrayList<String> getFriendsWithSameField(final String uuid, String field) throws userException {
         try {
             ArrayList<String> friends = new ArrayList<String>();
-            
+
             Callable allfriendsCallable = new Callable() {
 
                 @Override
@@ -649,7 +481,7 @@ public class friends {
                     return friends.getAllFriends();
                 }
             };
-            
+
             Callable fetchUserCallable = new Callable() {
 
                 @Override
@@ -659,15 +491,15 @@ public class friends {
                     return me;
                 }
             };
-            
+
             ExecutorService executor = Executors.newFixedThreadPool(2);
             ArrayList<Callable<Object>> list = new ArrayList<Callable<Object>>();
             list.add(allfriendsCallable);
             list.add(fetchUserCallable);
-            
+
             ArrayList<Future<Object>> futureList = new ArrayList<Future<Object>>();
             futureList = (ArrayList<Future<Object>>) executor.invokeAll(list);
-            
+
             ArrayList<String> myFriends = (ArrayList<String>) futureList.get(0).get();
             user me = (user) futureList.get(1).get();
             ArrayList<user> friendsDetails = multipleObjectsHandler.getUsers(myFriends);
@@ -675,15 +507,15 @@ public class friends {
                 String myEdu = ((basicEducationData) (me.getEducation().get(0))).getName();
                 for (user friend : friendsDetails) {
                     String eduId = ((basicEducationData) (me.getEducation().get(0))).getName();
-                    if(eduId.equals(myEdu)) {
+                    if (eduId.equals(myEdu)) {
                         friends.add(eduId);
                     }
                 }
-            } else if("company".equals(field)) {
+            } else if ("company".equals(field)) {
                 String myCompany = ((basicUserData) (me.getEducation().get(0))).getName();
                 for (user friend : friendsDetails) {
                     String compId = ((basicUserData) (me.getEducation().get(0))).getName();
-                    if(compId.equals(myCompany)) {
+                    if (compId.equals(myCompany)) {
                         friends.add(compId);
                     }
                 }

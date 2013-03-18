@@ -4,7 +4,11 @@
  */
 package javanb;
 
+import UGCThreads.board;
 import UGCThreads.links;
+import UGCThreads.page;
+import entity.entity;
+import friends.friends;
 import http.linkHandler;
 import http.linksCrawler;
 import java.io.FileNotFoundException;
@@ -12,7 +16,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.SQLException;
 import java.text.ParseException;
+import java.util.Iterator;
+import java.util.List;
 import javanb.userpackage.userException;
+import net.sf.json.JSONObject;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -26,6 +33,7 @@ public class JavaNB {
      */
     public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException, Exception {
         // TODO code application logic here
-        links l = new links(new URL("http://www.vogella.com/articles/JavaRegularExpressions/article.html"), "6a05b8829cbad91c53796337002b83c6");
+        friends f = new friends("06524f6541f83b817bf2f793a0a4ae04");
+        System.out.println(f.searchFriendsCommon("vid"));
     }
 }

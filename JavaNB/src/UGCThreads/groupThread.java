@@ -26,14 +26,33 @@ public class groupThread extends entity {
     protected boolean abuse;
     protected boolean disabled;
     private Hashtable privacyLevelMap;
-
-    public groupThread() {
+    
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("owner", owner);
+        json.put("title", title);
+        json.put("description", description);
+        json.put("tags", tags);
+        json.put("privacyLevel", privacyLevel);
+        json.put("timestamp", timestamp);
+        json.put("abuse", abuse);
+        json.put("disabled", disabled);
+        return json;
+    }
+    
+    private void initPrivacyMap() {
+        this.privacyLevelMap = new Hashtable();
         this.privacyLevelMap.put("all", "0");
         this.privacyLevelMap.put("membersOnly", "1");
         this.privacyLevelMap.put("ownersOnly", "2");
     }
 
+    public groupThread() {
+        this.initPrivacyMap();
+    }
+
     public groupThread(String id) {
+        this.initPrivacyMap();
         this.setUuid(id);
     }
 
