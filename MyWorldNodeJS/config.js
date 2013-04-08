@@ -25,10 +25,12 @@ var config = function() {
       if(key) {
         if(self.configInfo && self.configInfo[key]) {
           callback(self.configInfo[key]);
+        } else {
+          callback(null);
         }
-        callback(null);
+      } else {
+        callback(self.configInfo);
       }
-      callback(self.configInfo);
     };
 
     if(this.configInfo) {

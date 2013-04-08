@@ -66,7 +66,9 @@ public class UserResource {
             user existingUser = new user(uuid);
             existingUser.fetchEntity();
             JSONObject res = existingUser.getUserDetails();
+            System.out.println(res);
             return res.toString();
+//            new sqlpractice.SQLPractice();
         } catch (userException ex) {
             return ex.getErrorMsg();
         }
@@ -101,7 +103,7 @@ public class UserResource {
     public String postJson(String userInfo) throws userException {
         user newUser = new user();
         JSONObject obj = (JSONObject) JSONSerializer.toJSON(userInfo);
-        newUser.insertUser(obj);
-        return userInfo;
+        String uuid = newUser.insertUser(obj);
+        return uuid;
     }
 }

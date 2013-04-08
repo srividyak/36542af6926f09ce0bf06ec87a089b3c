@@ -16,11 +16,16 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.SQLException;
 import java.text.ParseException;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import javanb.userpackage.user;
 import javanb.userpackage.userException;
 import net.sf.json.JSONObject;
+import net.sf.json.JSONSerializer;
 import org.apache.commons.lang.StringUtils;
+import search.userSearch;
+import sqlManager.userDbManager;
 
 /**
  *
@@ -33,7 +38,9 @@ public class JavaNB {
      */
     public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException, Exception {
         // TODO code application logic here
-        friends f = new friends("06524f6541f83b817bf2f793a0a4ae04");
-        System.out.println(f.searchFriendsCommon("vid"));
+        
+        long time = (new Date()).getTime();
+        userSearch.searchAllUsers("vi");
+        System.out.println((new Date()).getTime() - time);
     }
 }

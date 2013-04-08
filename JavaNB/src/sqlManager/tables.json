@@ -1,0 +1,3 @@
+{
+    "users": ["firstName", "lastName", "middleName", "dob", "uuid", "interests", "phoneNum", "gender", "relStatus", "lang", "locations", "homeTown", "education", "about", "company", "email", "timestamp", "friendsCount", "disabled"]
+}

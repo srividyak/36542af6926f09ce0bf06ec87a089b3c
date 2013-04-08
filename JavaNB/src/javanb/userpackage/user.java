@@ -15,14 +15,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javanb.basicEducationData;
 import javanb.basicUserData;
-import javanb.companypackage.company;
-import javanb.educationpackage.education;
 import javanb.locationpackage.location;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.sf.json.JSONSerializer;
 import org.apache.commons.codec.digest.DigestUtils;
 import sqlManager.friendsTableManager;
+import sqlManager.userDbManager;
 import sqlManager.userTableManager;
 
 /**
@@ -41,9 +40,19 @@ public class user extends entity {
     private char relStatus;
     private String lang;
     private String about;
-    private String hometown;
+    private String homeTown;
     private String email;
     private long timestamp;
+    private int friendsCount;
+    /*
+     * arraylist
+     */
+    private ArrayList<basicUserData> locationsUserdata;
+    private ArrayList<basicEducationData> educationUserdata;
+    private ArrayList<basicUserData> companyUserdata;
+    private String locations;
+    private String education;
+    private String company;
 
     public long getTimestamp() {
         return timestamp;
@@ -53,22 +62,25 @@ public class user extends entity {
         this.timestamp = timestamp;
     }
 
+    public void setTimestamp(Long timestamp) {
+        this.timestamp = timestamp.longValue();
+    }
+
     public String getEmail() {
         return email;
+    }
+
+    public int getFriendsCount() {
+        return friendsCount;
+    }
+
+    public void setFriendsCount(int friendsCount) {
+        this.friendsCount = friendsCount;
     }
 
     public void setEmail(String email) {
         this.email = email;
     }
-    /*
-     * arraylist
-     */
-    private ArrayList<basicUserData> locations;
-    private ArrayList<basicEducationData> educations;
-    private ArrayList<basicUserData> companies;
-    private String locationString;
-    private String educationString;
-    private String companyString;
 
     public user() {
     }
@@ -83,39 +95,20 @@ public class user extends entity {
 
     @Override
     public void fetchEntity() throws userException {
-        try {
-            userTableManager tableMgr = new userTableManager(this.getUuid());
-            JSONObject userDetails = tableMgr.getUserDetails();
-            this.initUser(userDetails);
-        } catch (ParseException ex) {
-            throw new userException("error while fetching user" + ex.getMessage());
-        } catch (userException ex) {
-            throw new userException("error while fetching user" + ex.getMessage());
-        } catch (FileNotFoundException ex) {
-            throw new userException("error while fetching user" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("error while fetching user" + ex.getMessage());
-        } catch (SQLException ex) {
-            System.err.println(ex.getErrorCode() + "state:" + ex.getSQLState());
-            throw new userException("error while fetching user" + ex.getMessage());
-        }
+        new userDbManager(uuid, this);
     }
 
-    public void insertUser(JSONObject userInfo) throws userException {
+    public String insertUser(JSONObject userInfo) throws userException {
         try {
             this.initUser(userInfo);
             this.setUuid(this.generateUUID());
             userInfo.put("uuid", this.getUuid());
-            userTableManager newUser = new userTableManager(userInfo);
-        } catch (FileNotFoundException ex) {
-            throw new userException("error while inserting user" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("error while inserting user" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("error while inserting user" + ex.getMessage());
+            new userDbManager(userInfo);
+            return this.getUuid();
         } catch (ParseException ex) {
-            throw new userException("error while inserting user" + ex.getMessage());
+            Logger.getLogger(user.class.getName()).log(Level.SEVERE, null, ex);
         }
+        return null;
     }
 
     //API to get userDetails as a JSONObject
@@ -131,10 +124,10 @@ public class user extends entity {
         userDetails.put("relStatus", this.relStatus);
         userDetails.put("lang", this.lang);
         userDetails.put("about", this.about);
-        userDetails.put("hometown", this.hometown);
-        userDetails.put("locations", this.locationString);
-        userDetails.put("educations", this.educationString);
-        userDetails.put("companies", this.companyString);
+        userDetails.put("hometown", this.homeTown);
+        userDetails.put("locations", this.locations);
+        userDetails.put("educations", this.education);
+        userDetails.put("companies", this.company);
         userDetails.put("uuid", this.uuid);
         userDetails.put("email", this.email);
         userDetails.put("timestamp", this.timestamp);
@@ -158,19 +151,21 @@ public class user extends entity {
     //init all details in local variables
     private void initUser(JSONObject userInfo) throws userException, ParseException {
         //update the user's locations with id so that only id is stored in the users table
-        if (userInfo.containsKey("hometown")) {
-            JSONObject hometown = (JSONObject) JSONSerializer.toJSON(userInfo.getString("hometown"));
+        if (userInfo.containsKey("homeTown")) {
+            JSONObject homeTown = (JSONObject) JSONSerializer.toJSON(userInfo.getString("homeTown"));
             //put only id and get rid of all other fields
-            if (hometown.containsKey("name")) {
-                hometown.put("id", location.generateId(hometown.getString("name")));
-            } else if (hometown.containsKey("id")) {
-                hometown.put("id", hometown.getString("id"));
+            if (homeTown.containsKey("name")) {
+                homeTown.put("id", location.generateId(homeTown.getString("name")));
+            } else if (homeTown.containsKey("id")) {
+                homeTown.put("id", homeTown.getString("id"));
             }
-            hometown.remove("name");
-            hometown.remove("stateName");
-            hometown.remove("stateId");
-            hometown.remove("countryId");
-            hometown.remove("countryName");
+            homeTown.remove("name");
+            homeTown.remove("stateName");
+            homeTown.remove("stateId");
+            homeTown.remove("countryId");
+            homeTown.remove("countryName");
+        } else {
+            userInfo.put("homeTown", "{}");
         }
         if (userInfo.containsKey("locations")) {
             JSONArray locations = userInfo.getJSONArray("locations");
@@ -188,34 +183,40 @@ public class user extends entity {
                 loc.remove("countryId");
                 loc.remove("countryName");
             }
+        } else {
+            userInfo.put("locations", "[]");
         }
         //update user's company with id
-        if (userInfo.containsKey("companies")) {
+        if (userInfo.containsKey("company")) {
             JSONArray companies = userInfo.getJSONArray("companies");
             for (int i = 0, max = companies.size(); i < max; i++) {
                 JSONObject comp = companies.getJSONObject(i);
                 if (comp.containsKey("name")) {
-                    comp.put("id", company.generateId(comp.getString("name")));
+                    comp.put("id", location.generateId(comp.getString("name")));
                 } else if (comp.containsKey("id")) {
                     comp.put("id", comp.getString("id"));
                 }
                 //get rid of all other fields
                 comp.remove("name");
             }
+        } else {
+            userInfo.put("company", "[]");
         }
         //update user education with id
-        if (userInfo.containsKey("educations")) {
+        if (userInfo.containsKey("education")) {
             JSONArray educations = userInfo.getJSONArray("educations");
             for (int i = 0, max = educations.size(); i < max; i++) {
                 JSONObject edu = educations.getJSONObject(i);
                 if (edu.containsKey("name")) {
-                    edu.put("id", education.generateId(edu.getString("name")));
+                    edu.put("id", location.generateId(edu.getString("name")));
                 } else if (edu.containsKey("id")) {
                     edu.put("id", edu.getString("id"));
                 }
                 //get rid of name
                 edu.remove("name");
             }
+        } else {
+            userInfo.put("education", "[]");
         }
 
         if (!userInfo.containsKey("firstName")) {
@@ -233,6 +234,7 @@ public class user extends entity {
         this.setLastName(userInfo.getString("lastName"));
         this.setDob(userInfo.getString("dob"));
         this.setTimestamp((new Date()).getTime());
+        userInfo.put("timestamp", this.getTimestamp());
         String gender = userInfo.getString("gender");
         if (gender.equalsIgnoreCase("1")) {
             this.setGender(true);
@@ -240,25 +242,22 @@ public class user extends entity {
             this.setGender(false);
         }
         this.setEmail(userInfo.getString("email"));
-        try {
-            this.setAbout(userInfo.containsKey("about") ? userInfo.getString("about") : "");
-            this.setMiddleName(userInfo.containsKey("middleName") ? userInfo.getString("middleName") : "");
-            this.setInterests(userInfo.containsKey("interests") ? userInfo.getString("interests") : "");
-            this.setHometown(userInfo.containsKey("hometown") ? userInfo.getString("hometown") : "");
-            this.setLang(userInfo.containsKey("lang") ? userInfo.getString("lang") : "");
-            this.setPhoneNum(userInfo.containsKey("phoneNum") ? userInfo.getString("phoneNum") : "");
-            this.setLocations(userInfo.containsKey("locations") ? userInfo.getString("locations") : "");
-            this.setCompany(userInfo.containsKey("companies") ? userInfo.getString("companies") : "");
-            this.setEducation(userInfo.containsKey("educations") ? userInfo.getString("educations") : "");
 
-            char relStatus = userInfo.containsKey("relStatus") ? userInfo.getString("relStatus").charAt(0) : '1';
-            if ((int) relStatus >= (int) ('1') && (int) relStatus <= (int) ('9')) {
-                this.setRelStatus(relStatus);
-            } else {
-                throw new userException("invalid relationship status");
-            }
-        } catch (Exception e) {
-            System.out.println("Could not find some field");
+        this.setAbout(userInfo.containsKey("about") ? userInfo.getString("about") : "");
+        this.setMiddleName(userInfo.containsKey("middleName") ? userInfo.getString("middleName") : "");
+        this.setInterests(userInfo.containsKey("interests") ? userInfo.getString("interests") : "");
+        this.setHomeTown(userInfo.containsKey("homeTown") ? userInfo.getString("homeTown") : "{}");
+        this.setLang(userInfo.containsKey("lang") ? userInfo.getString("lang") : "");
+        this.setPhoneNum(userInfo.containsKey("phoneNum") ? userInfo.getString("phoneNum") : "");
+        this.setLocations(userInfo.containsKey("locations") ? userInfo.getString("locations") : "[]");
+        this.setCompany(userInfo.containsKey("companies") ? userInfo.getString("company") : "[]");
+        this.setEducation(userInfo.containsKey("educations") ? userInfo.getString("education") : "[]");
+
+        char relStatus = userInfo.containsKey("relStatus") ? userInfo.getString("relStatus").charAt(0) : '1';
+        if ((int) relStatus >= (int) ('1') && (int) relStatus <= (int) ('9')) {
+            this.setRelStatus(relStatus);
+        } else {
+            throw new userException("invalid relationship status");
         }
 
     }
@@ -276,16 +275,16 @@ public class user extends entity {
         this.about = about;
     }
 
-    public void setCompany(ArrayList companies) {
+    public void setCompanyUserdata(ArrayList companies) {
         //TODO - check if assigning directly works correctly
-        this.companies = companies;
+        this.companyUserdata = companies;
     }
 
     public void setCompany(String companyString) throws userException {
-        this.companyString = companyString;
-        this.companies = new ArrayList<basicUserData>();
+        this.company = companyString;
+        this.companyUserdata = new ArrayList<basicUserData>();
         if (companyString != null) {
-            this.setArrayLists(companyString, this.companies);
+            this.setArrayLists(companyString, this.companyUserdata);
         }
     }
 
@@ -293,16 +292,16 @@ public class user extends entity {
         this.dob = dob;
     }
 
-    public void setEducation(ArrayList education) {
+    public void setEducationUserdata(ArrayList education) {
         //TODO - check if assigning directly works correctly
-        this.educations = education;
+        this.educationUserdata = education;
     }
 
     public void setEducation(String educationString) throws userException {
-        this.educationString = educationString;
-        this.educations = new ArrayList<basicEducationData>();
+        this.education = educationString;
+        this.educationUserdata = new ArrayList<basicEducationData>();
         if (educationString != null) {
-            this.setbasicEducationData(educationString, this.educations);
+            this.setbasicEducationData(educationString, this.educationUserdata);
         }
     }
 
@@ -314,8 +313,12 @@ public class user extends entity {
         this.gender = gender;
     }
 
-    public void setHometown(String hometown) {
-        this.hometown = hometown;
+    public void setGender(Boolean gender) {
+        this.gender = gender.booleanValue();
+    }
+
+    public void setHomeTown(String hometown) {
+        this.homeTown = hometown;
     }
 
     public void setInterests(String interests) {
@@ -330,9 +333,9 @@ public class user extends entity {
         this.lastName = lastName;
     }
 
-    public void setLocations(ArrayList locations) {
+    public void setLocationsUserdata(ArrayList locations) {
         //TODO - check if assigning directly works correctly
-        this.locations = locations;
+        this.locationsUserdata = locations;
     }
 
     //company or location should be a JSONArray: each JSONObject of the form: name,startDate,endDate
@@ -356,10 +359,10 @@ public class user extends entity {
      * startDate,endDate,place;startDate,endDate,place;....
      */
     public void setLocations(String locations) throws userException {
-        this.locationString = locations;
-        this.locations = new ArrayList<basicUserData>();
+        this.locations = locations;
+        this.locationsUserdata = new ArrayList<basicUserData>();
         if (locations != null) {
-            this.setArrayLists(locations, this.locations);
+            this.setArrayLists(this.locations, this.locationsUserdata);
         }
     }
 
@@ -375,16 +378,16 @@ public class user extends entity {
         return about;
     }
 
-    public ArrayList getCompany() {
-        return companies;
+    public ArrayList getCompanyUserdata() {
+        return companyUserdata;
     }
 
     public String getDob() {
         return dob;
     }
 
-    public ArrayList getEducation() {
-        return educations;
+    public ArrayList getEducationUserdata() {
+        return educationUserdata;
     }
 
     public String getFirstName() {
@@ -395,8 +398,8 @@ public class user extends entity {
         return gender;
     }
 
-    public String getHometown() {
-        return hometown;
+    public String getHomeTown() {
+        return homeTown;
     }
 
     public String getInterests() {
@@ -419,8 +422,8 @@ public class user extends entity {
         return lastName;
     }
 
-    public ArrayList getLocations() {
-        return locations;
+    public ArrayList getLocationsUserdata() {
+        return locationsUserdata;
     }
 
     public String getPhoneNum() {
@@ -457,50 +460,29 @@ public class user extends entity {
         }
     }
 
-    public JSONObject getFields(String[] fields) throws userException {
-        try {
-            userTableManager sqlManager = new userTableManager();
-            return sqlManager.getFields(fields, uuid);
-        } catch (FileNotFoundException ex) {
-            throw new userException("some exception occured while fetching fields" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("some exception occured while fetching fields" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("some exception occured while fetching fields" + ex.getMessage());
+    public void updateUser(JSONObject userDetails) throws userException {
+        if (this.uuid == null) {
+            if (!userDetails.containsKey("uuid")) {
+                throw new userException("You are trying to update user without uuid. Update user of particular uuid");
+            } else {
+                this.setUuid(userDetails.getString("uuid"));
+            }
         }
+        if (userDetails.containsKey("timestamp")) {
+            userDetails.remove("timestamp");
+        }
+        if (userDetails.containsKey("uuid")) {
+            userDetails.remove("uuid");
+        }
+        userDbManager sqlManager = new userDbManager();
+        sqlManager.updateUser(uuid, userDetails);
     }
 
-    public void updateUser(JSONObject userDetails) throws userException {
-        try {
-            if (this.uuid == null) {
-                if (!userDetails.containsKey("uuid")) {
-                    throw new userException("You are trying to update user without uuid. Update user of particular uuid");
-                } else {
-                    this.setUuid(userDetails.getString("uuid"));
-                }
-            }
-            if(userDetails.containsKey("timestamp")) {
-                userDetails.remove("timestamp");
-            }
-            if(userDetails.containsKey("uuid")) {
-                userDetails.remove("uuid");
-            }
-            userTableManager sqlManager = new userTableManager();
-            sqlManager.updateUser(uuid, userDetails);
-        } catch (FileNotFoundException ex) {
-            throw new userException("error occured while updating user:" + ex.getMessage());
-        } catch (IOException ex) {
-            throw new userException("error occured while updating user:" + ex.getMessage());
-        } catch (SQLException ex) {
-            throw new userException("error occured while updating user:" + ex.getMessage());
-        }
-    }
-    
     public void deleteUser() throws userException {
         try {
             userTableManager sqlManager = new userTableManager();
             JSONObject obj = new JSONObject();
-            obj.put("disabled","1");
+            obj.put("disabled", "1");
             sqlManager.updateUser(uuid, obj);
         } catch (FileNotFoundException ex) {
             throw new userException("error while deleting/disabling user:" + ex.getMessage());

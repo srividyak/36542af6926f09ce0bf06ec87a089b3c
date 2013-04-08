@@ -369,10 +369,10 @@ public class friends {
     private void attachChildrenToNetwork(JSONArray nextLevelFriends, networkBlob curNode) throws userException {
         for (int i = 0, max = nextLevelFriends.size(); i < max; i++) {
             user me = new user(this.uuid);
+            me.fetchEntity();
             String[] fields = {"friendsCount"};
             JSONObject friend = nextLevelFriends.getJSONObject(i);
-            JSONObject friendsCountObj = me.getFields(fields);
-            friend.put("friendsCount", friendsCountObj.getInt("friendsCount"));
+            friend.put("friendsCount", me.getFriendsCount());
         }
         this.sortBasis = "friendsCount";
         this.sort(nextLevelFriends);
@@ -404,7 +404,6 @@ public class friends {
                 }
             }
         }
-
     }
 
     public JSONObject searchFriendsCommon(String name) throws userException {
@@ -504,17 +503,17 @@ public class friends {
             user me = (user) futureList.get(1).get();
             ArrayList<user> friendsDetails = multipleObjectsHandler.getUsers(myFriends);
             if ("education".equals(field)) {
-                String myEdu = ((basicEducationData) (me.getEducation().get(0))).getName();
+                String myEdu = ((basicEducationData) (me.getEducationUserdata().get(0))).getName();
                 for (user friend : friendsDetails) {
-                    String eduId = ((basicEducationData) (me.getEducation().get(0))).getName();
+                    String eduId = ((basicEducationData) (me.getEducationUserdata().get(0))).getName();
                     if (eduId.equals(myEdu)) {
                         friends.add(eduId);
                     }
                 }
             } else if ("company".equals(field)) {
-                String myCompany = ((basicUserData) (me.getEducation().get(0))).getName();
+                String myCompany = ((basicUserData) (me.getEducationUserdata().get(0))).getName();
                 for (user friend : friendsDetails) {
-                    String compId = ((basicUserData) (me.getEducation().get(0))).getName();
+                    String compId = ((basicUserData) (me.getEducationUserdata().get(0))).getName();
                     if (compId.equals(myCompany)) {
                         friends.add(compId);
                     }

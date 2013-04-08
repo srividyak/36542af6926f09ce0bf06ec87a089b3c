@@ -24,6 +24,20 @@ public class trie {
         root = new trieNode('#');
     }
     
+    public trie(ArrayList<String> names) {
+        root = new trieNode('#');
+        for(String name: names) {
+            this.addName(name);
+        }
+    }
+    
+    public trie(HashMap<String,Object> hash) {
+        root = new trieNode('#');
+        for(Map.Entry<String,Object> entry : hash.entrySet()) {
+            this.addName(entry.getKey(), entry.getValue());
+        }
+    }
+    
     public trieNode searchName(String name) {
         trieNode ptr = root;
         for (int i = 0, max = name.length(); i < max; i++) {

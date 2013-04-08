@@ -18,6 +18,10 @@ import sqlManager.companyTableManager;
 public class company {
     String id;
     String name;
+
+    public String getName() {
+        return name;
+    }
     String description = "";
     String[] keywords;
     
@@ -26,10 +30,18 @@ public class company {
             compData.put("id",company.generateId(compData.getString("name")));
         }
         companyTableManager sqlManager = new companyTableManager(compData);
-        JSONObject companyDetails = sqlManager.getCompanyDetails();
-        this.name = companyDetails.getString("name");
-        this.id = companyDetails.getString("id");
-        this.description = companyDetails.getString("description");
+        this.name = compData.getString("name");
+        this.id = compData.getString("id");
+        this.description = compData.getString("description");
+        this.extractKeys();
+    }
+    
+    public company() {
+        
+    }
+    
+    public company(String id) {
+        new companyTableManager(id, this);
         this.extractKeys();
     }
 

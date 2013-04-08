@@ -5,31 +5,38 @@
 package sqlManager;
 
 import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.Driver;
 import com.mysql.jdbc.PreparedStatement;
 import com.sun.rowset.CachedRowSetImpl;
+import com.sun.tools.internal.xjc.api.S2JJAXBModel;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLXML;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javanb.userpackage.user;
 import javanb.userpackage.userException;
 import net.sf.json.JSONObject;
 import net.spy.memcached.MemcachedClient;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.WordUtils;
 
 /**
  *
  * @author srivid
  */
-public class sqlUtils {
+public class sqlUtils<T> {
 
     public String dbms;
     public String jarFile;
@@ -44,8 +51,8 @@ public class sqlUtils {
     private int memcachedClientPort;
     private MemcachedClient memcachedClient;
     private final int expirationMemcached = 3600;
-    
     protected ExecutorService executorService = null;
+    protected Connection dbConnection = null;
 
     protected class setMemcache implements Runnable {
 
@@ -87,10 +94,19 @@ public class sqlUtils {
         }
     }
 
-    public sqlUtils() throws FileNotFoundException, IOException, InvalidPropertiesFormatException {
+    public sqlUtils() {
         this.prop = new Properties();
-        FileInputStream fis = new FileInputStream("/Users/srivid/myProjects/myWorld/repository/JavaNB/src/sqlManager/sql-properties.xml");
-        prop.loadFromXML(fis);
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream("/Users/srivid/myProjects/myWorld/repository/JavaNB/src/sqlManager/sql-properties.xml");
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        try {
+            prop.loadFromXML(fis);
+        } catch (IOException ex) {
+            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+        }
 
         this.dbms = this.prop.getProperty("dbms");
         this.jarFile = this.prop.getProperty("jar_file");
@@ -102,21 +118,22 @@ public class sqlUtils {
         this.port = Integer.parseInt(this.prop.getProperty("port_number"));
 
         this.memcachedClientPort = 11211;
-        this.memcachedClient = new MemcachedClient(new InetSocketAddress("localhost", this.memcachedClientPort));
-        
+        try {
+            this.memcachedClient = new MemcachedClient(new InetSocketAddress("localhost", this.memcachedClientPort));
+        } catch (IOException ex) {
+            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
         this.executorService = Executors.newFixedThreadPool(16); // should be configurable but limiting to 16 for now
     }
 
     public Connection getConnection() throws SQLException {
         Connection conn = null;
-        Properties connectionProps = new Properties();
-        connectionProps.put("user", this.userName);
-        connectionProps.put("password", this.password);
         String currentUrlString = null;
-        currentUrlString = "jdbc:" + this.dbms + "://" + this.serverName + ":" + this.port + "/";
-        conn = (Connection) DriverManager.getConnection(currentUrlString, connectionProps);
+        currentUrlString = "jdbc:" + this.dbms + "://" + this.serverName + ":" + this.port + "/" + this.dbName;
+        new Driver();
+        conn = (Connection) DriverManager.getConnection(currentUrlString, this.userName, this.password);
         this.urlString = currentUrlString + this.dbName;
-        conn.setCatalog(this.dbName);
         return conn;
     }
 
@@ -242,10 +259,12 @@ public class sqlUtils {
     }
 
     /**
-     * API to execute multiple queries parallely. It uses the thread pool to execute queries in threads
+     * API to execute multiple queries parallely. It uses the thread pool to
+     * execute queries in threads
+     *
      * @param stmts - arraylist of prepared statements to be executed
      * @return hashtable of results with keys being the query
-     * @throws userException 
+     * @throws userException
      */
     protected Hashtable<String, ResultSet> executeMultipleQueries(ArrayList<PreparedStatement> stmts) throws userException {
         try {
@@ -286,4 +305,127 @@ public class sqlUtils {
             throw new userException("error occured while executing query : " + ex.getMessage());
         }
     }
+
+    private String getSetterMethod(String param) {
+        return "set" + WordUtils.capitalize(param);
+    }
+
+    public T resultSetToJavaObject(T requiredObject, ResultSet resultSet) {
+        try {
+            java.sql.ResultSetMetaData metaData = resultSet.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            Class clazz = requiredObject.getClass();
+            for (int i = 1; i < columnCount; i++) {
+                try {
+                    String columnName = metaData.getColumnName(i);
+                    int sqlType = metaData.getColumnType(i);
+                    String methodString = this.getSetterMethod(columnName);
+                    try {
+                        try {
+                            switch (sqlType) {
+                                case java.sql.Types.ARRAY:
+                                case java.sql.Types.LONGVARBINARY:
+                                case java.sql.Types.BINARY:
+                                case java.sql.Types.BIT:
+                                case java.sql.Types.BLOB:
+                                case java.sql.Types.CLOB:
+                                case java.sql.Types.DATALINK:
+                                case java.sql.Types.NCLOB:
+                                case java.sql.Types.REF:
+                                case java.sql.Types.VARBINARY:
+                                case java.sql.Types.NVARCHAR:
+                                case java.sql.Types.NULL:
+                                case java.sql.Types.STRUCT:
+                                    break;
+                                case java.sql.Types.BIGINT:
+                                    clazz.getMethod(methodString, long.class).invoke(requiredObject, resultSet.getLong(i));
+                                    break;
+                                case java.sql.Types.VARCHAR:
+                                    clazz.getMethod(methodString, String.class).invoke(requiredObject, resultSet.getString(i));
+                                    break;
+                                case java.sql.Types.BOOLEAN:
+                                    System.out.println(columnName + ",type=" + sqlType + ",boolean");
+                                    break;
+                                case java.sql.Types.CHAR:
+                                    clazz.getMethod(methodString, char.class).invoke(requiredObject, resultSet.getString(i).charAt(0));
+                                    break;
+                                case java.sql.Types.DATE:
+                                    clazz.getMethod(methodString, String.class).invoke(requiredObject, resultSet.getString(i));
+                                    break;
+                                case java.sql.Types.DECIMAL:
+                                    try {
+                                        clazz.getMethod(methodString, float.class).invoke(requiredObject, resultSet.getFloat(i));
+                                    } catch (NoSuchMethodException e) {
+                                        clazz.getMethod(methodString, double.class).invoke(requiredObject, resultSet.getDouble(i));
+                                    }
+                                    break;
+                                case java.sql.Types.DOUBLE:
+                                    clazz.getMethod(methodString, double.class).invoke(requiredObject, resultSet.getDouble(i));
+                                    break;
+                                case java.sql.Types.FLOAT:
+                                    clazz.getMethod(methodString, float.class).invoke(requiredObject, resultSet.getFloat(i));
+                                    break;
+                                case java.sql.Types.INTEGER:
+                                    clazz.getMethod(methodString, int.class).invoke(requiredObject, resultSet.getInt(i));
+                                    break;
+                                case java.sql.Types.JAVA_OBJECT:
+                                    clazz.getMethod(methodString, Object.class).invoke(requiredObject, resultSet.getObject(i));
+                                    break;
+                                case java.sql.Types.LONGNVARCHAR:
+                                    clazz.getMethod(methodString, String.class).invoke(requiredObject, resultSet.getString(i));
+                                    break;
+                                case java.sql.Types.LONGVARCHAR:
+                                    clazz.getMethod(methodString, String.class).invoke(requiredObject, resultSet.getString(i));
+                                    break;
+                                case java.sql.Types.NCHAR:
+                                    clazz.getMethod(methodString, char.class).invoke(requiredObject, resultSet.getString(i).charAt(0));
+                                    break;
+                                case java.sql.Types.NUMERIC:
+                                    clazz.getMethod(methodString, int.class).invoke(requiredObject, resultSet.getInt(i));
+                                    break;
+                                case java.sql.Types.OTHER:
+                                    clazz.getMethod(methodString, Object.class).invoke(requiredObject, resultSet.getObject(i));
+                                    break;
+                                case java.sql.Types.REAL:
+                                    clazz.getMethod(methodString, float.class).invoke(requiredObject, resultSet.getFloat(i));
+                                    break;
+                                case java.sql.Types.SMALLINT:
+                                    clazz.getMethod(methodString, int.class).invoke(requiredObject, resultSet.getInt(i));
+                                    break;
+                                case java.sql.Types.SQLXML:
+                                    clazz.getMethod(methodString, SQLXML.class).invoke(requiredObject, resultSet.getSQLXML(i));
+                                    break;
+                                case java.sql.Types.TIME:
+                                case java.sql.Types.TIMESTAMP:
+                                    clazz.getMethod(methodString, long.class).invoke(requiredObject, resultSet.getLong(i));
+                                    break;
+                                case java.sql.Types.TINYINT:
+                                    clazz.getMethod(methodString, int.class).invoke(requiredObject, resultSet.getInt(i));
+                                    break;
+                                default:
+                                    break;
+                            }
+                        } catch (IllegalAccessException ex) {
+                            Logger.getLogger(userDbManager.class.getName() + ",columnName" + columnName).log(Level.SEVERE, null, ex);
+                        } catch (IllegalArgumentException ex) {
+                            Logger.getLogger(userDbManager.class.getName() + ",columnName" + columnName).log(Level.SEVERE, null, ex);
+                        } catch (InvocationTargetException ex) {
+                            Logger.getLogger(userDbManager.class.getName() + ",columnName" + columnName).log(Level.SEVERE, null, ex);
+                        }
+                    } catch (NoSuchMethodException ex) {
+                        Logger.getLogger(userDbManager.class.getName() + ",columnName" + columnName).log(Level.SEVERE, null, ex);
+                    } catch (SecurityException ex) {
+                        Logger.getLogger(userDbManager.class.getName() + ",columnName" + columnName).log(Level.SEVERE, null, ex);
+                    }
+                } catch (SecurityException ex) {
+                    Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+        } catch (SQLException ex) {
+            Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return requiredObject;
+    }
+
 }

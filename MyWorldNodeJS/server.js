@@ -1,12 +1,22 @@
 var http = require('http');
 var config = require('./config');
+var middleware = require('./middleware');
+var queryParser = require('./queryParser');
 
 var cfgObj = new config.config();
 function start(port) {
   function onRequest(request, response) {
     console.log("Request received");
-
-    var options = {
+    new queryParser.queryParser(request, function(queryParams) {
+      if(queryParams) {
+        request[request.method.toLowerCase() + 'Params'] = queryParams;
+      }
+      new middleware.middleware(request, response, cfgObj);
+    });
+    /*
+     * router(request.url);
+     */
+/*    var options = {
       hostname: 'localhost',
       port: 4080,
       path: '/MyWorldWebService/v1/user?uuid=672a1f98c258811a09741e033cabdf26',
@@ -30,7 +40,7 @@ function start(port) {
       console.log('error: ' + e.message);
     });
 
-    req.end();
+    req.end();*/
 
   }
 

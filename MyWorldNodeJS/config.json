@@ -1,3 +1,10 @@
 {
-  "port":"8666"
+  "port":"8666",
+  "baseDir": "/Users/srivid/myProjects/myWorld/repository/MyWorldNodeJS/",
+  "apiUrls" : {
+    "getUser" : "/MyWorldWebService/v1/user?uuid=%",
+    "createUser" : "/MyWorldWebService/v1/user/create",
+    "updateUser" : "/MyWorldWebService/v1/user/update",
+    "getUserBoards" : "/MyWorldWebService/v1/user/boards"
+  }
 }
