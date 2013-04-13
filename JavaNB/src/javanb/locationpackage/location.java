@@ -23,6 +23,18 @@ public class location {
     private String stateName;
     private String countryId;
     private String countryName;
+    
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("id", this.getId());
+        json.put("name", this.getName());
+        json.put("description", this.getDescription());
+        json.put("stateId", this.getStateId());
+        json.put("stateName", this.getStateName());
+        json.put("countryId", this.getCountryId());
+        json.put("countryName", this.getCountryName());
+        return json;
+    }
 
     public String getCountryId() {
         return countryId;
@@ -69,6 +81,10 @@ public class location {
     //for search use case
     public location(String name) {
     }
+    
+    public location() {
+        
+    }
 
     public String getName() {
         return name;
@@ -84,6 +100,38 @@ public class location {
 
     public String getId() {
         return id;
+    }
+
+    public void setCountryId(String countryId) {
+        this.countryId = countryId;
+    }
+
+    public void setCountryName(String countryName) {
+        this.countryName = countryName;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public void setKeywords(String[] keywords) {
+        this.keywords = keywords;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setStateId(String stateId) {
+        this.stateId = stateId;
+    }
+
+    public void setStateName(String stateName) {
+        this.stateName = stateName;
     }
     
     public static String generateId(String name) {

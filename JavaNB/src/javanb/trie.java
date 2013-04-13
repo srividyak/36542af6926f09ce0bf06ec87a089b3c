@@ -6,14 +6,13 @@ package javanb;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
  *
  * @author srivid
  */
-public class trie {
+public class trie<T> {
     trieNode root;
 
     public trieNode getRoot() {
@@ -31,9 +30,9 @@ public class trie {
         }
     }
     
-    public trie(HashMap<String,Object> hash) {
+    public trie(HashMap<String,T> hash) {
         root = new trieNode('#');
-        for(Map.Entry<String,Object> entry : hash.entrySet()) {
+        for(Map.Entry<String,T> entry : hash.entrySet()) {
             this.addName(entry.getKey(), entry.getValue());
         }
     }
@@ -81,7 +80,7 @@ public class trie {
         return temp;
     }
     
-    public trieNode addName(String name, Object endObject) {
+    public trieNode addName(String name, T endObject) {
         trieNode t = this.addName(name);
         if(t != null) {
             t.setEnd(endObject);
@@ -95,23 +94,23 @@ public class trie {
         }
     }
     
-    public void addNames(HashMap<String,Object> nameToObj) {
-        for(Map.Entry<String,Object> entry : nameToObj.entrySet()) {
+    public void addNames(HashMap<String,T> nameToObj) {
+        for(Map.Entry<String,T> entry : nameToObj.entrySet()) {
             this.addName(entry.getKey(), entry.getValue());
         }
     }
     
-    public HashMap<String,Object> autocomplete(String prefix, trieNode from) {
+    public HashMap<String,ArrayList<T>> autocomplete(String prefix, trieNode from) {
         ArrayList<trieNode> stack = new ArrayList<trieNode>();
         stack.add(from);
         String suffix = "";
-        HashMap<String,Object> hash = new HashMap<String, Object>();
+        HashMap<String,ArrayList<T>> hash = new HashMap<String, ArrayList<T>>();
         while (stack.size() != 0) {
             trieNode curNode = (stack.get(stack.size() - 1)).getNextChild();
             if (curNode != null) {
                 suffix += curNode.getAlphabet();
                 if(curNode.isEnd()) {
-                    hash.put(prefix + suffix, curNode.getEndObject());
+                    hash.put(prefix + suffix, (ArrayList<T>) curNode.getEndObject());
                 }
                 stack.add(curNode);
             } else {

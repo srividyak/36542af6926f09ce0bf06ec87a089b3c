@@ -68,12 +68,12 @@ public class userDbManager extends sqlUtils {
         ResultSet resultSet;
         ArrayList<user> users = new ArrayList<user>();
         try {
-            String query = "select * from users where uuid in ({})";
+            String query = "select * from users where uuid in (placeholder)";
             for (int i = 0; i < len; i++) {
                 replacements += "?,";
             }
             replacements = StringUtils.strip(replacements, ",");
-            query = query.replaceAll("{}", replacements);
+            query = query.replaceAll("placeholder", replacements);
             stmt = (PreparedStatement) this.dbConnection.prepareStatement(query);
             for (int i = 0; i < len; i++) {
                 stmt.setString(i + 1, uuids.get(i));
@@ -100,7 +100,7 @@ public class userDbManager extends sqlUtils {
         String query = "select * from users";
         try {
             PreparedStatement stmt = (PreparedStatement) this.dbConnection.prepareStatement(query);
-            ResultSet rs = stmt.executeQuery();
+            ResultSet rs = this.executeQuery(stmt);
             ArrayList<user> users = new ArrayList<user>();
             while (rs.next()) {
                 user user = new user();
@@ -109,6 +109,8 @@ public class userDbManager extends sqlUtils {
                 users.add(user);
             }
             return users;
+        } catch (userException ex) {
+            Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
         } catch (SQLException ex) {
             Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
         }

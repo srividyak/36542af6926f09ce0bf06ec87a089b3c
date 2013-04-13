@@ -19,6 +19,22 @@ public class company {
     String id;
     String name;
 
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public void setKeywords(String[] keywords) {
+        this.keywords = keywords;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public String getName() {
         return name;
     }
@@ -64,5 +80,13 @@ public class company {
     
     public static String generateId(String name) {
         return name.trim().toLowerCase().replace(' ', '_');
+    }
+    
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("id", this.getId());
+        json.put("name", this.getName());
+        json.put("description", this.getDescription());
+        return json;
     }
 }

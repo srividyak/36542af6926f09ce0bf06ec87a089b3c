@@ -10,6 +10,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javanb.locationpackage.location;
 import javanb.userpackage.userException;
 import net.sf.json.JSONObject;
 
@@ -17,45 +21,34 @@ import net.sf.json.JSONObject;
  *
  * @author srivid
  */
-public class locationTableManager {
+public class locationTableManager extends sqlUtils {
+
     private Connection locationConnection;
     private JSONObject locationDetails;
-    
-    private void getLocationConnection() throws FileNotFoundException, IOException, SQLException {
-        sqlUtils utils = new sqlUtils();
-        this.locationConnection = utils.getConnection();
+    private location location;
+
+    public location getLocation() {
+        return location;
     }
-    
-    private void setLocationDetails(String id, String name, String stateId, String stateName, String countryId, String countryName, String description) {
-        this.locationDetails = new JSONObject();
-        this.locationDetails.put("id", id);
-        this.locationDetails.put("name", name);
-        this.locationDetails.put("stateId", stateId);
-        this.locationDetails.put("stateName", stateName);
-        this.locationDetails.put("countryId", countryId);
-        this.locationDetails.put("countryName", countryName);
-        this.locationDetails.put("description", description);
-    }
-    
+
     //TODO - search usecase
     public String searchLocations(String name) {
         String searchQuery = "select * from locations where name = ? or stateName = ? or countryName = ?";
         return "";
     }
-    
+
     public locationTableManager(JSONObject locData) throws FileNotFoundException, IOException, SQLException, userException {
-        this.getLocationConnection();
-        if(locData.containsKey("id")) {
+        this.dbConnection = this.getConnection();
+        if (locData.containsKey("id")) {
             String selectString = "select * from locations where id = ?";
             PreparedStatement selectQuery = (PreparedStatement) this.locationConnection.prepareStatement(selectString);
             selectQuery.setString(1, locData.getString("id"));
             ResultSet getRow = selectQuery.executeQuery();
             boolean noLoc = true;
-            while(getRow.next()) {
+            while (getRow.next()) {
                 noLoc = false;
-                this.setLocationDetails(getRow.getString("id"), getRow.getString("name"), getRow.getString("stateId"), getRow.getString("stateName"), getRow.getString("countryId"), getRow.getString("countryName"), getRow.getString("description"));
             }
-            if(noLoc) {
+            if (noLoc) {
                 try {
                     String insertString = "insert into locations (id,name,stateId,stateName,countryId,countryName,description) values(?,?,?,?,?,?,?)";
                     PreparedStatement insertQuery = (PreparedStatement) this.locationConnection.prepareStatement(insertString);
@@ -67,15 +60,60 @@ public class locationTableManager {
                     insertQuery.setString(6, (locData.containsKey("countryName")) ? locData.getString("countryName") : "");
                     insertQuery.setString(7, (locData.containsKey("description")) ? locData.getString("description") : "");
                     insertQuery.executeUpdate();
-                    this.setLocationDetails(locData.getString("id"), locData.getString("name"), locData.getString("stateId"), locData.getString("stateName"), locData.getString("countryId"), locData.getString("countryName"), locData.containsKey("description") ? locData.getString("description") : "");
-                } catch(SQLException sqle) {
+                } catch (SQLException sqle) {
                     System.out.println("Some error inserting into location table:" + sqle.getMessage());
                 }
             }
         }
     }
 
+    public locationTableManager() {
+        try {
+            this.dbConnection = this.getConnection();
+        } catch (SQLException ex) {
+            Logger.getLogger(locationTableManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    public locationTableManager(String id, location location) {
+        try {
+            this.dbConnection = this.getConnection();
+            String query = "select * from locations where id=?";
+            PreparedStatement stmt = (PreparedStatement) this.dbConnection.prepareStatement(query);
+            stmt.setString(1, id);
+            ResultSet rs = this.executeQuery(stmt);
+            if (rs.next()) {
+                this.resultSetToJavaObject(location, rs);
+                this.location = location;
+            }
+        } catch (userException ex) {
+            Logger.getLogger(locationTableManager.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(locationTableManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
     public JSONObject getLocationDetails() {
         return locationDetails;
+    }
+    
+    public ArrayList<location> getAllLocations() {
+        try {
+            String query = "select * from locations";
+            PreparedStatement stmt = (PreparedStatement) this.dbConnection.prepareStatement(query);
+            ArrayList<location> locations = new ArrayList<location>();
+            ResultSet rs = this.executeQuery(stmt);
+            while(rs.next()) {
+                location location = new location();
+                this.resultSetToJavaObject(location, rs);
+                locations.add(location);
+            }
+            return locations;
+        } catch (userException ex) {
+            Logger.getLogger(locationTableManager.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(locationTableManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
     }
 }

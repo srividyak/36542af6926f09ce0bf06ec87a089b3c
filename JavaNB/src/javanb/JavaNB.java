@@ -7,6 +7,8 @@ package javanb;
 import UGCThreads.board;
 import UGCThreads.links;
 import UGCThreads.page;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
 import entity.entity;
 import friends.friends;
 import http.linkHandler;
@@ -21,10 +23,16 @@ import java.util.Iterator;
 import java.util.List;
 import javanb.userpackage.user;
 import javanb.userpackage.userException;
+import misc.sqlUtils;
 import net.sf.json.JSONObject;
 import net.sf.json.JSONSerializer;
 import org.apache.commons.lang.StringUtils;
+import search.companySearch;
+import search.educationSearch;
+import search.locationSearch;
 import search.userSearch;
+import sqlManager.companyTableManager;
+import sqlManager.connectionManager;
 import sqlManager.userDbManager;
 
 /**
@@ -38,9 +46,12 @@ public class JavaNB {
      */
     public static void main(String[] args) throws userException, FileNotFoundException, SQLException, IOException, ParseException, Exception {
         // TODO code application logic here
-        
         long time = (new Date()).getTime();
-        userSearch.searchAllUsers("vi");
-        System.out.println((new Date()).getTime() - time);
+        System.out.println(companySearch.searchAllCompaniesByName("s"));
+        System.out.println("for location srch = " + ((new Date()).getTime() - time));
+        time = (new Date()).getTime();
+        JSONObject eduRes = (educationSearch.searchAllEducationByName("a"));
+        System.out.println(eduRes.size());
+        System.out.println("for location srch = " + ((new Date()).getTime() - time));
     }
 }

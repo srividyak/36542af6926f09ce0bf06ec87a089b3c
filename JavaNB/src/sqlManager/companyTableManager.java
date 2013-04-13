@@ -4,7 +4,6 @@
  */
 package sqlManager;
 
-import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
 import java.io.FileNotFoundException;
 import java.io.IOException;

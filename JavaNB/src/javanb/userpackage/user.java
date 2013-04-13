@@ -44,6 +44,15 @@ public class user extends entity {
     private String email;
     private long timestamp;
     private int friendsCount;
+    private char disabled;
+
+    public char getDisabled() {
+        return disabled;
+    }
+
+    public void setDisabled(char disabled) {
+        this.disabled = disabled;
+    }
     /*
      * arraylist
      */

@@ -22,6 +22,7 @@ import javanb.userpackage.userException;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import sqlManager.friendsTableManager;
+import sqlManager.userDbManager;
 
 /**
  *
@@ -34,6 +35,11 @@ public class friends {
     private final int numTopViewed;
     private String sortBasis = "viewCount";
     private boolean trieFlag = false;
+    protected networkBlob myNetwork = null;
+    protected trie firstnameCommonTrie = null;
+    protected trie middlenameCommonTrie = null;
+    protected trie lastnameCommonTrie = null;
+    protected trie friendTrie = null;
 
     private class networkBlob {
 
@@ -60,12 +66,6 @@ public class friends {
             this.parent = parentNode;
         }
     }
-
-    protected networkBlob myNetwork = null;
-    
-    protected trie firstnameCommonTrie = null;
-    protected trie middlenameCommonTrie = null;
-    protected trie lastnameCommonTrie = null;
 
     public String getUuid() {
         return uuid;
@@ -406,56 +406,33 @@ public class friends {
         }
     }
 
-    public JSONObject searchFriendsCommon(String name) throws userException {
+    public JSONObject searchFriends(String name) throws userException {
         JSONObject friends = new JSONObject();
         if (!trieFlag) {
-            this.firstnameCommonTrie = new trie();
-            this.lastnameCommonTrie = new trie();
-            this.middlenameCommonTrie = new trie();
+            this.friendTrie = new trie<user>();
             ArrayList<String> topViewedFriends = this.getTopViewed();
-            ArrayList<user> users = multipleObjectsHandler.getUsers(topViewedFriends);
-            for (int i = 0, max = users.size(); i < max; i++) {
-                user me = users.get(i);
-                this.firstnameCommonTrie.addName(me.getFirstName(), topViewedFriends.get(i));
-                this.lastnameCommonTrie.addName(me.getLastName(), topViewedFriends.get(i));
-                this.middlenameCommonTrie.addName(me.getMiddleName(), topViewedFriends.get(i));
+            userDbManager sqlManager = new userDbManager();
+            ArrayList<user> users = sqlManager.getMultipleUsers(topViewedFriends);
+            for (user user : users) {
+                this.friendTrie.addName(user.getFirstName(), user);
+                this.friendTrie.addName(user.getLastName(), user);
+                if (!user.getMiddleName().equals("")) {
+                    this.friendTrie.addName(user.getMiddleName(), user);
+                }
             }
             this.trieFlag = true;
         }
-        trieNode firstnameTrieNode = this.firstnameCommonTrie.searchName(name);
-        trieNode lastnameTrieNode = this.lastnameCommonTrie.searchName(name);
-        trieNode middlenameTrieNode = this.middlenameCommonTrie.searchName(name);
-        if(firstnameTrieNode != null) {
-            HashMap<String,Object> firstnameHashMap = this.firstnameCommonTrie.autocomplete(name, firstnameTrieNode);
-            JSONArray firstnameArray = new JSONArray();
-            for(Map.Entry<String,Object> entry : firstnameHashMap.entrySet()) {
-                JSONObject firstnameJSONObject = new JSONObject();
-                firstnameJSONObject.put(entry.getKey(), entry.getValue());
-                firstnameArray.add(firstnameJSONObject);
+        trieNode trieNode = this.friendTrie.searchName(name);
+        if (trieNode != null) {
+            HashMap<String, ArrayList<user>> searchHash = this.friendTrie.autocomplete(name, trieNode);
+            for (Map.Entry<String, ArrayList<user>> entry : searchHash.entrySet()) {
+                ArrayList<user> searchedUsers = entry.getValue();
+                JSONArray value = new JSONArray();
+                for (user searchedUser : searchedUsers) {
+                    value.add(searchedUser.getUserDetails());
+                }
+                friends.put(entry.getKey(), value);
             }
-            friends.put("firstName", firstnameArray);
-        }
-        
-        if(lastnameTrieNode != null) {
-            HashMap<String,Object> lastnameHashMap = this.lastnameCommonTrie.autocomplete(name, lastnameTrieNode);
-            JSONArray lastnameArray = new JSONArray();
-            for(Map.Entry<String,Object> entry : lastnameHashMap.entrySet()) {
-                JSONObject lastnameJSONObject = new JSONObject();
-                lastnameJSONObject.put(entry.getKey(), entry.getValue());
-                lastnameArray.add(lastnameJSONObject);
-            }
-            friends.put("lastName", lastnameArray);
-        }
-        
-        if(middlenameTrieNode != null) {
-            HashMap<String,Object> middlenameHashMap = this.middlenameCommonTrie.autocomplete(name, middlenameTrieNode);
-            JSONArray middlenameArray = new JSONArray();
-            for(Map.Entry<String,Object> entry : middlenameHashMap.entrySet()) {
-                JSONObject middlenameJSONObject = new JSONObject();
-                middlenameJSONObject.put(entry.getKey(), entry.getValue());
-                middlenameArray.add(middlenameJSONObject);
-            }
-            friends.put("middleName", middlenameArray);
         }
         return friends;
     }

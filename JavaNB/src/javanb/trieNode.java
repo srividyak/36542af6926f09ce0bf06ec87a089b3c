@@ -10,12 +10,15 @@ import java.util.ArrayList;
  *
  * @author srivid
  */
-public class trieNode {
+public class trieNode<T> {
 
     private char alphabet;
     private ArrayList<trieNode> children;
     private boolean end;
-    
+    private int childPointer = 0;
+    //this is to track multiple objects that a searched word leads to
+    private ArrayList<T> endObjects;
+
     public int getChildCount() {
         return this.children.size();
     }
@@ -28,11 +31,9 @@ public class trieNode {
         return end;
     }
 
-    public Object getEndObject() {
-        return endObject;
+    public ArrayList<T> getEndObject() {
+        return this.endObjects;
     }
-    private Object endObject;
-    private int childPointer = 0;
 
     public trieNode(char c) {
         this.alphabet = c;
@@ -43,9 +44,12 @@ public class trieNode {
         this.end = true;
     }
 
-    public void setEnd(Object o) {
+    public void setEnd(T o) {
         this.end = true;
-        this.endObject = o;
+        if(this.endObjects == null) {
+            this.endObjects = new ArrayList<T>();
+        }
+        this.endObjects.add(o);
     }
 
     public void addChild(trieNode child) {
@@ -66,9 +70,9 @@ public class trieNode {
     public void resetChildPtr() {
         this.childPointer = 0;
     }
-    
+
     public trieNode getChild(int i) {
-        if(i < this.children.size()) {
+        if (i < this.children.size()) {
             return this.children.get(i);
         }
         return null;

@@ -10,6 +10,8 @@ import java.util.Map;
 import javanb.companypackage.company;
 import javanb.trie;
 import javanb.trieNode;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
 import sqlManager.companyTableManager;
 
 /**
@@ -18,26 +20,34 @@ import sqlManager.companyTableManager;
  */
 public class companySearch {
 
-    public static ArrayList<company> searchAllCompanies(String prefix) {
-        ArrayList<company> resultCompanies = new ArrayList<company>();
+    public static JSONObject searchAllCompaniesByName(String prefix) {
+        JSONObject resultCompanies = new JSONObject();
         companyTableManager sqlManager = new companyTableManager();
         ArrayList<company> companies = sqlManager.getAllCompanies();
-        trie companyTrie = new trie();
+        trie<company> companyTrie = new trie<company>();
         
         //populating tries
         for (company company : companies) {
             String name = company.getName();
             String nameParts[] = name.split(" ");
             for (String eachName : nameParts) {
-                companyTrie.addName(eachName, company);
+                companyTrie.addName(eachName.toLowerCase(), company);
             }
         }
         
         //search for prefix
-        trieNode companyTrieNode = companyTrie.searchName(prefix);
-        HashMap<String,Object> companySearchHashMap = companyTrie.autocomplete(prefix, companyTrieNode);
-        for(Map.Entry<String,Object> entry : companySearchHashMap.entrySet()) {
-            resultCompanies.add((company)entry.getValue());
+        trieNode companyTrieNode = companyTrie.searchName(prefix.toLowerCase());
+        if(companyTrieNode == null) {
+            return null;
+        }
+        HashMap<String, ArrayList<company>> companySearchHashMap = companyTrie.autocomplete(prefix.toLowerCase(), companyTrieNode);
+        for (Map.Entry<String, ArrayList<company>> entry : companySearchHashMap.entrySet()) {
+            ArrayList<company> searchedCompanies = entry.getValue();
+            JSONArray value = new JSONArray();
+            for(company eachCompany : searchedCompanies) {
+                value.add(eachCompany.toJson());
+            }
+            resultCompanies.put(entry.getKey(), value);
         }
         return resultCompanies;
     }

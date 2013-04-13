@@ -131,10 +131,11 @@ public class sqlUtils<T> {
         Connection conn = null;
         String currentUrlString = null;
         currentUrlString = "jdbc:" + this.dbms + "://" + this.serverName + ":" + this.port + "/" + this.dbName;
-        new Driver();
-        conn = (Connection) DriverManager.getConnection(currentUrlString, this.userName, this.password);
+//        new Driver();
+//        conn = (Connection) DriverManager.getConnection(currentUrlString, this.userName, this.password);
         this.urlString = currentUrlString + this.dbName;
-        return conn;
+//        return conn;
+        return connectionManager.getConnection(currentUrlString, this.userName, this.password);
     }
 
     public void closeConnection(Connection connArg) {
@@ -266,7 +267,7 @@ public class sqlUtils<T> {
      * @return hashtable of results with keys being the query
      * @throws userException
      */
-    protected Hashtable<String, ResultSet> executeMultipleQueries(ArrayList<PreparedStatement> stmts) throws userException {
+    public Hashtable<String, ResultSet> executeMultipleQueries(ArrayList<PreparedStatement> stmts) throws userException {
         try {
             ArrayList<Callable<Hashtable<String, ResultSet>>> callables = new ArrayList<Callable<Hashtable<String, ResultSet>>>();
             for (PreparedStatement stmt : stmts) {
@@ -315,7 +316,7 @@ public class sqlUtils<T> {
             java.sql.ResultSetMetaData metaData = resultSet.getMetaData();
             int columnCount = metaData.getColumnCount();
             Class clazz = requiredObject.getClass();
-            for (int i = 1; i < columnCount; i++) {
+            for (int i = 1; i <= columnCount; i++) {
                 try {
                     String columnName = metaData.getColumnName(i);
                     int sqlType = metaData.getColumnType(i);

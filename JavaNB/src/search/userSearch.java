@@ -20,72 +20,33 @@ import sqlManager.userDbManager;
  */
 public class userSearch {
 
-    public static JSONObject searchAllUsers(String prefix) {
-        JSONObject userInfo = new JSONObject();
+    public static JSONObject searchAllUsersByName(String prefix) {
+        JSONObject searchresult = new JSONObject();
         userDbManager sqlDbManager = new userDbManager();
         ArrayList<user> users = sqlDbManager.getMultipleUsers();
 
-        ArrayList<String> firstNames = new ArrayList<String>();
-        ArrayList<String> lastNames = new ArrayList<String>();
-        ArrayList<String> middleNames = new ArrayList<String>();
-
-        trie firstNameTrie, lastNameTrie, middleNameTrie;
-        trieNode firstNameTrieNode, lastNameTrieNode, middleNameTrieNode;
-        
-        HashMap<String, Object> firstNameHashmap = new HashMap<String, Object>(),
-                lastNameHashmap = new HashMap<String, Object>(),
-                middleNameHashmap = new HashMap<String, Object>();
-
+        trie<user> searchTrie = new trie<user>();
         for (user user : users) {
-            firstNameHashmap.put(user.getFirstName(), user);
-            lastNameHashmap.put(user.getLastName(), user);
-            middleNameHashmap.put(user.getMiddleName(), user);
-        }
-        
-        firstNameTrie = new trie(firstNameHashmap);
-        lastNameTrie = new trie(lastNameHashmap);
-        middleNameTrie = new trie(middleNameHashmap);
-        
-        firstNameTrieNode = firstNameTrie.searchName(prefix);
-        lastNameTrieNode = lastNameTrie.searchName(prefix);
-        middleNameTrieNode = middleNameTrie.searchName(prefix);
-        
-        if(firstNameTrieNode != null) {
-            firstNameHashmap = firstNameTrie.autocomplete(prefix, firstNameTrieNode);
-            JSONArray firstnameArray = new JSONArray();
-            for(Map.Entry<String,Object> entry : firstNameHashmap.entrySet()) {
-                JSONObject firstnameJSONObject = new JSONObject();
-                user newuser = (user) entry.getValue();
-                firstnameJSONObject.put(entry.getKey(), newuser.getUserDetails().toString());
-                firstnameArray.add(firstnameJSONObject);
+            searchTrie.addName(user.getFirstName().toLowerCase(), user);
+            searchTrie.addName(user.getLastName().toLowerCase(), user);
+            if (!user.getMiddleName().equals("")) {
+                searchTrie.addName(user.getMiddleName().toLowerCase(), user);
             }
-            userInfo.put("firstName", firstnameArray);
         }
-        
-        if(lastNameTrieNode != null) {
-            lastNameHashmap = lastNameTrie.autocomplete(prefix, lastNameTrieNode);
-            JSONArray lastnameArray = new JSONArray();
-            for(Map.Entry<String,Object> entry : firstNameHashmap.entrySet()) {
-                JSONObject firstnameJSONObject = new JSONObject();
-                user newuser = (user) entry.getValue();
-                firstnameJSONObject.put(entry.getKey(), newuser.getUserDetails().toString());
-                lastnameArray.add(firstnameJSONObject);
+        trieNode trieNode = searchTrie.searchName(prefix.toLowerCase());
+        if (trieNode != null) {
+            HashMap<String, ArrayList<user>> searchHash = searchTrie.autocomplete(prefix.toLowerCase(), trieNode);
+            for (Map.Entry<String, ArrayList<user>> entry : searchHash.entrySet()) {
+                ArrayList<user> searchedUsers = entry.getValue();
+                JSONArray value = new JSONArray();
+                for (user searchedUser : searchedUsers) {
+                    value.add(searchedUser.getUserDetails());
+                }
+                searchresult.put(entry.getKey(), value);
             }
-            userInfo.put("lastName", lastnameArray);
+        } else {
+            return null;
         }
-        
-        if(middleNameTrieNode != null) {
-            middleNameHashmap = middleNameTrie.autocomplete(prefix, middleNameTrieNode);
-            JSONArray middlenameArray = new JSONArray();
-            for(Map.Entry<String,Object> entry : firstNameHashmap.entrySet()) {
-                JSONObject firstnameJSONObject = new JSONObject();
-                user newuser = (user) entry.getValue();
-                firstnameJSONObject.put(entry.getKey(), newuser.getUserDetails().toString());
-                middlenameArray.add(firstnameJSONObject);
-            }
-            userInfo.put("middleName", middlenameArray);
-        }
-        return userInfo;
+        return searchresult;
     }
-    
 }
