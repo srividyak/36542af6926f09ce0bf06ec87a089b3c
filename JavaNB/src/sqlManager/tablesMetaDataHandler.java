@@ -21,7 +21,7 @@ import org.json.simple.parser.ParseException;
 public class tablesMetaDataHandler {
     static JSONObject allTables;
     
-    public static String[] getTableInfo(String tableName) {
+    public static JSONObject getTableInfo(String tableName) {
         if(allTables == null) {
             try {
                 JSONParser parser = new JSONParser();
@@ -35,12 +35,8 @@ public class tablesMetaDataHandler {
             }
         }
         if(allTables.containsKey(tableName)) {
-            JSONArray fields = (JSONArray) allTables.get(tableName);
-            String[] columns = new String[fields.size()];
-            for(int i=0,max=fields.size();i<max;i++) {
-                columns[i] = (String) fields.get(i);
-            }
-            return columns;
+            JSONObject fields = (JSONObject) allTables.get(tableName);
+            return fields;
         }
         return null;
     }

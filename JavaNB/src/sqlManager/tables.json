@@ -1,3 +1,4 @@
 {
-    "users": ["firstName", "lastName", "middleName", "dob", "uuid", "interests", "phoneNum", "gender", "relStatus", "lang", "locations", "homeTown", "education", "about", "company", "email", "timestamp", "friendsCount", "disabled"]
+    "users" : ["firstName", "lastName", "middleName", "dob", "uuid", "interests", "phoneNum", "gender", "relStatus", "lang", "locations", "homeTown", "education", "about", "company", "email", "timestamp", "friendsCount", "disabled"],
+    "board" : {"boardId" : "String", "shareCount" : "Long", "upRatingsCount" : "Long", "downRatingsCount" : "Long", "type" : "String", "title" : "String", "description" : "String", "content" : "String", "timestamp" : "Long", "uuid" : "String", "abuseFlag" : "Char", "tags" : "String", "commentsCount" : "Long", "targetUuid" : "String"}
 }

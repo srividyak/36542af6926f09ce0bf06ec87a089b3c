@@ -31,5 +31,8 @@
       </select>
       <input type="submit" value="submit"/>
     </form>
+    <label for="userSearch"></label><input type="text" id="userSearch" name="userSearch"/>
   </body>
+  <script src="http://yui.yahooapis.com/3.9.1/build/yui/yui-min.js"></script>
+  <script src="http://localhost/js/userSearchIO.js"></script>
 </html>

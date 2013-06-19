@@ -2,5 +2,8 @@
   "uiUrls" : {
     "^/$" : "home",
     "^/[0-9A-Za-z]+$" : "user"
+  },
+  "ajaxUrls" : {
+    "/user/search" : "userSearch"
   }
 }

@@ -27,6 +27,7 @@ public class userDbManager extends sqlUtils {
     private user user;
 
     public userDbManager() {
+        super();
         try {
             this.dbConnection = this.getConnection();
         } catch (SQLException ex) {
@@ -118,100 +119,25 @@ public class userDbManager extends sqlUtils {
     }
 
     public userDbManager(JSONObject userInfo) throws userException {
+        super();
         try {
             this.dbConnection = this.getConnection();
-            String query = "insert into users ";
-            String columns[] = tablesMetaDataHandler.getTableInfo("users");
-            String keys = "";
-            String values = "";
-            PreparedStatement insertRow;
-
-            /*
-             * populating keys and values
-             */
-            for (String column : columns) {
-                if (userInfo.containsKey(column)) {
-                    keys += column + ",";
-                    values += "?,";
-                }
-            }
-            keys = StringUtils.strip(keys, ",");
-            keys = "(" + keys + ")";
-
-            values = StringUtils.strip(values, ",");
-            values = "values(" + values + ")";
-
-            query += " " + keys + " " + values;
-            String email = userInfo.getString("email");
-            SimpleDateFormat simpleDob = new SimpleDateFormat("yyyy-mm-dd", Locale.ENGLISH);
-            java.util.Date dob = simpleDob.parse(userInfo.getString("dob"));
-            java.sql.Date sqlDate = new java.sql.Date(dob.getTime());
-            insertRow = (PreparedStatement) this.dbConnection.prepareStatement(query);
-            int j = 1;
-            for (int i = 0, max = columns.length; i < max; i++) {
-                String column = columns[i];
-                if (column.equals("dob")) {
-                    insertRow.setDate(j, sqlDate);
-                    j++;
-                } else if (column.equals("gender")) {
-                    insertRow.setBoolean(j, userInfo.getBoolean(column));
-                    j++;
-                } else {
-                    if (userInfo.containsKey(columns[i])) {
-                        insertRow.setString(j, userInfo.getString(columns[i]));
-                        j++;
-                    }
-                }
-            }
+            PreparedStatement insertRow = this.getFormattedQuery("users", userInfo, "insert");
             try {
                 insertRow.executeUpdate();
             } catch (SQLException sqle) {
                 Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, sqle);
             }
-        } catch (ParseException ex) {
-            Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
         } catch (SQLException ex) {
             Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     public void updateUser(String uuid, JSONObject userDetails) throws userException {
+        PreparedStatement updateRow = this.getFormattedQuery("users", userDetails, "update");
         try {
-            String query = "update users set params where uuid=?";
-            String replacements = "";
-            Iterator keys = userDetails.keys();
-            while (keys.hasNext()) {
-                replacements += keys.next() + "=?,";
-            }
-            int length = replacements.length();
-            if (length > 0) {
-                replacements = replacements.substring(0, length - 1);
-            }
-            query = query.replaceAll("params", replacements);
-            PreparedStatement stmt = (PreparedStatement) this.dbConnection.prepareStatement(query);
-            keys = userDetails.keys();
-            int index = 1;
-            while (keys.hasNext()) {
-                String key = (String) keys.next();
-                if ("gender".equals(key)) {
-                    stmt.setBoolean(index, userDetails.getBoolean(key));
-                } else if ("dob".equals(key)) {
-                    SimpleDateFormat simpleDob = new SimpleDateFormat("yyyy-mm-dd", Locale.ENGLISH);
-                    java.util.Date dob = simpleDob.parse(userDetails.getString(key));
-                    java.sql.Date sqlDate = new java.sql.Date(dob.getTime());
-                    stmt.setDate(index, sqlDate);
-                } else if ("friendsCount".equals(key)) {
-                    stmt.setInt(index, userDetails.getInt(key));
-                } else {
-                    stmt.setString(index, userDetails.getString(key));
-                }
-                index++;
-            }
-            stmt.setString(index, uuid);
-            stmt.executeUpdate();
+            updateRow.executeUpdate();
             this.invalidateCacheForUuids(uuid);
-        } catch (ParseException ex) {
-            Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
         } catch (SQLException ex) {
             Logger.getLogger(userDbManager.class.getName()).log(Level.SEVERE, null, ex);
         }

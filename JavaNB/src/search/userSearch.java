@@ -5,6 +5,7 @@
 package search;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import javanb.trie;
@@ -22,8 +23,13 @@ public class userSearch {
 
     public static JSONObject searchAllUsersByName(String prefix) {
         JSONObject searchresult = new JSONObject();
+        long time = (new Date()).getTime();
         userDbManager sqlDbManager = new userDbManager();
+        System.out.println("time taken for db connection initialization=" + ((new Date()).getTime() - time));
+        time = (new Date()).getTime();
         ArrayList<user> users = sqlDbManager.getMultipleUsers();
+        System.out.println("time taken for db fetch=" + ((new Date()).getTime() - time));
+        time = (new Date()).getTime();
 
         trie<user> searchTrie = new trie<user>();
         for (user user : users) {
@@ -47,6 +53,7 @@ public class userSearch {
         } else {
             return null;
         }
+        System.out.println("time taken for search=" + ((new Date()).getTime() - time));
         return searchresult;
     }
 }

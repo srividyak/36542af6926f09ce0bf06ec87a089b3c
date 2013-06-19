@@ -5,6 +5,7 @@
     "getUser" : "/MyWorldWebService/v1/user?uuid=%",
     "createUser" : "/MyWorldWebService/v1/user/create",
     "updateUser" : "/MyWorldWebService/v1/user/update",
-    "getUserBoards" : "/MyWorldWebService/v1/user/boards"
+    "getUserBoards" : "/MyWorldWebService/v1/user/boards",
+    "userSearch" : "/MyWorldWebService/v1/user/search?query=%"
   }
 }

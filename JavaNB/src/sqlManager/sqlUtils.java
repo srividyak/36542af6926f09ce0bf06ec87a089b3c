@@ -20,12 +20,15 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLXML;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javanb.userpackage.user;
 import javanb.userpackage.userException;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import net.spy.memcached.MemcachedClient;
 import org.apache.commons.codec.binary.Hex;
@@ -232,7 +235,9 @@ public class sqlUtils<T> {
      */
     protected void invalidateCache(PreparedStatement[] stmt) throws userException {
         for (int i = 0, max = stmt.length; i < max; i++) {
-            this.invalidateCache(stmt[i]);
+            if (stmt[i] != null) {
+                this.invalidateCache(stmt[i]);
+            }
         }
     }
 
@@ -254,6 +259,47 @@ public class sqlUtils<T> {
             }
             return stmt;
         } catch (SQLException ex) {
+            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+
+    public Hashtable<String, Integer> executeMultipleUpdates(ArrayList<PreparedStatement> stmts) {
+        List<Callable<Hashtable<String, Integer>>> callables = Collections.synchronizedList(new LinkedList<Callable<Hashtable<String, Integer>>>());
+        for (PreparedStatement stmt : stmts) {
+            final PreparedStatement statement = stmt;
+            Callable<Hashtable<String, Integer>> callable = new Callable<Hashtable<String, Integer>>() {
+
+                @Override
+                public Hashtable<String, Integer> call() throws Exception {
+                    int result = statement.executeUpdate();
+                    Hashtable<String, Integer> res = new Hashtable<String, Integer>();
+                    res.put(statement.toString(), new Integer(result));
+                    return res;
+                }
+            };
+            callables.add(callable);
+        }
+
+        List<Future<Hashtable<String, Integer>>> futures = Collections.synchronizedList(new LinkedList<Future<Hashtable<String, Integer>>>());
+        try {
+            futures = (List<Future<Hashtable<String, Integer>>>) this.executorService.invokeAll(callables);
+            Hashtable<String, Integer> result = new Hashtable<String, Integer>();
+            for (Future<Hashtable<String, Integer>> future : futures) {
+                try {
+                    Hashtable r = future.get();
+                    Enumeration keys = r.keys();
+                    while (keys.hasMoreElements()) {
+                        String key = (String) keys.nextElement();
+                        Integer integer = (Integer) r.get(key);
+                        result.put(key, integer);
+                    }
+                } catch (ExecutionException ex) {
+                    Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            return result;
+        } catch (InterruptedException ex) {
             Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
         }
         return null;
@@ -429,4 +475,131 @@ public class sqlUtils<T> {
         return requiredObject;
     }
 
+    protected PreparedStatement getFormattedQuery(String tableName, JSONObject tbInserted, String action) {
+        try {
+            String query = "";
+            if ("insert".equals(action.toLowerCase())) {
+                query = "insert into " + tableName + " ";
+            } else if ("update".equals(action.toLowerCase())) {
+                query = "update " + tableName + " set ";
+            } else {
+                return null;
+            }
+            org.json.simple.JSONObject tableInfo = tablesMetaDataHandler.getTableInfo(tableName);
+            String keys = "";
+            String values = "";
+            PreparedStatement insertRow;
+            Set<String> tableSet = tableInfo.keySet();
+            Iterator<String> tableIt = tableSet.iterator();
+            /*
+             * populating keys and values
+             */
+            while (tableIt.hasNext()) {
+                String column = tableIt.next();
+                if (tbInserted.containsKey(column)) {
+                    if ("insert".equals(action.toLowerCase())) {
+                        keys += column + ",";
+                        values += "?,";
+                    } else {
+                        if (!((String) tableInfo.get(column)).equals("String")) {
+                            if (tbInserted.getString(column).equals("increment")) {
+                                query += column + "=" + column + "+1";
+                            } else if (tbInserted.getString(column).equals("decrement")) {
+                                query += column + "=" + column + "-1";
+                            } else {
+                                query += column + "=?,";
+                            }
+                        } else {
+                            query += column + "=?,";
+                        }
+
+                    }
+                }
+            }
+
+            if ("insert".equals(action.toLowerCase())) {
+                keys = StringUtils.strip(keys, ",");
+                keys = "(" + keys + ")";
+
+                values = StringUtils.strip(values, ",");
+                values = "values(" + values + ")";
+
+                query += " " + keys + " " + values;
+            } else {
+                query = StringUtils.strip(query, ",");
+                int numColsUpdated = tbInserted.size();
+                if (tbInserted.containsKey("identifiers")) {
+                    numColsUpdated--;
+                    query += " where ";
+                    JSONObject identifiers = tbInserted.getJSONObject("identifiers");
+                    Iterator<String> identifierCols = identifiers.keys();
+                    while (identifierCols.hasNext()) {
+                        query += identifierCols.next() + "?,";
+                    }
+                    query = StringUtils.strip(query, ",");
+                }
+            }
+            tableIt = tableSet.iterator();
+            insertRow = (PreparedStatement) this.dbConnection.prepareStatement(query);
+            Class clazz = insertRow.getClass();
+            int j = 1;
+            for (int i = 0, max = tableSet.size(); i < max; i++) {
+                String column;
+                if (tableIt.hasNext()) {
+                    column = tableIt.next();
+                    if (tbInserted.containsKey(column)) {
+                        String type = (String) tableInfo.get(column), methodName = "set" + type;
+                        Class paramClass = String.class;
+                        if ("String".equals(type)) {
+                            paramClass = String.class;
+                        } else if ("Int".equals(type)) {
+                            paramClass = int.class;
+                        } else if ("Long".equals(type)) {
+                            paramClass = long.class;
+                        } else if ("Date".equals(type)) {
+                            paramClass = java.sql.Date.class;
+                        } else if ("Char".equals(type)) {
+                            paramClass = char.class;
+                        } else if ("Boolean".equals(type)) {
+                            paramClass = boolean.class;
+                        }
+
+                        try {
+                            try {
+                                if ("Date".equals(type)) {
+                                    SimpleDateFormat simpleDob = new SimpleDateFormat("yyyy-mm-dd", Locale.ENGLISH);
+                                    try {
+                                        java.util.Date date = simpleDob.parse(tbInserted.getString(column));
+                                        java.sql.Date paramDate = new java.sql.Date(date.getTime());
+                                        insertRow.setDate(j, paramDate);
+                                    } catch (ParseException ex) {
+                                        Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
+                                } else {
+                                    clazz.getMethod(methodName, int.class, paramClass).invoke(insertRow, j,
+                                            tbInserted.getClass().getMethod("get" + type, String.class).invoke(tbInserted, column));
+                                }
+
+                            } catch (NoSuchMethodException ex) {
+                                Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (SecurityException ex) {
+                                Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        } catch (IllegalAccessException ex) {
+                            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IllegalArgumentException ex) {
+                            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (InvocationTargetException ex) {
+                            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        j++;
+                    }
+                }
+            }
+            return insertRow;
+        } catch (SQLException ex) {
+            Logger.getLogger(sqlUtils.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
 }
